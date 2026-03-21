@@ -1,0 +1,15 @@
+{
+  "preset": "standard-singles",
+  "level": 50,
+  "maxTeamSize": 3,
+  "pickedTeamSize": 3,
+  "openTeamSheets": false,
+  "allowTerastal": true,
+  "customRules": [],
+  "targetPokemon": [
+    "Pikachu",
+    "Charizard",
+    "Meowscarada"
+  ],
+  "bannedPokemon": []
+}

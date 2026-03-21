@@ -1,0 +1,21 @@
+# Workspace-level ignores for the monorepo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*~
+*.swp
+*.swo
+
+# Go build/test artifacts
+*.exe
+*.out
+*.test
+/showdown-go-client/showcli
+
+# Local runtime/build artifacts
+/pokemon-showdown-local/node_modules/
+/pokemon-showdown-local/dist/
+/pokemon-showdown-local/logs/
+/pokemon-showdown-local/tmp/
+/pokemon-showdown-client-local/node_modules/
