@@ -171,6 +171,8 @@ The server distributes the resulting rule definition through the local-format qu
 
 - LAN-specific notes: `pokemon-showdown-local/LOCAL_LAN_SETUP.md`
 - Japanese handoff guide: `HANDOFF.ja.md`
+- ChatGPT context summary: `CHATGPT_CONTEXT.ja.md`
 - Go client details: `showdown-go-client/README.md`
+- AI training guide: `showdown-go-client/AI_TRAINING.ja.md`
 - Upstream Showdown server documentation: `pokemon-showdown-local/README.md`
 - Upstream Showdown client documentation: `pokemon-showdown-client-local/README.md`

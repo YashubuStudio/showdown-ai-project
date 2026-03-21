@@ -42,6 +42,20 @@ go run ./cmd/showcli mockbattle --server http://127.0.0.1:8000 --format gen9rand
 go run ./cmd/showcli gui --addr 127.0.0.1:8099
 ```
 
+## AI training client
+
+This repository also includes `showtrain`, a separate CLI for self-play reinforcement learning from another PC.
+
+Examples:
+
+```bash
+go run ./cmd/showtrain probe --server http://127.0.0.1:8000
+go run ./cmd/showtrain train --server http://127.0.0.1:8000 --format gen9randombattle --battles 50
+go run ./cmd/showtrain evaluate --server http://127.0.0.1:8000 --model models/selfplay-latest.json --battles 20
+```
+
+For custom teams on `[Gen 9] Showdown Suite Studio`, expose the Go API and pass `--api-base`. The Japanese guide is in `AI_TRAINING.ja.md`.
+
 ## HTTP API
 
 When running `showcli serve` or `showcli gui`, the following local endpoints are available:

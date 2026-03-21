@@ -171,6 +171,8 @@ curl -s http://127.0.0.1:8099/api/status \
 
 - LAN 固有メモ: `pokemon-showdown-local/LOCAL_LAN_SETUP.md`
 - 引き渡しガイド: `HANDOFF.ja.md`
+- ChatGPT 向け要約: `CHATGPT_CONTEXT.ja.md`
 - Go クライアント詳細: `showdown-go-client/README.md`
+- AI 学習ガイド: `showdown-go-client/AI_TRAINING.ja.md`
 - upstream Showdown サーバー文書: `pokemon-showdown-local/README.md`
 - upstream Showdown クライアント文書: `pokemon-showdown-client-local/README.md`
