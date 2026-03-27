@@ -26,6 +26,26 @@ export class PSSearchResults extends preact.Component<{
 	moveIds: ID[] = [];
 	resultIndex = -1;
 
+	renderDisplayName(sourceName: string, displayName: string, matchStart: number, matchEnd: number, tagStart?: number) {
+		if (!Dex.shouldUseLocalizedNames() || !displayName || displayName === sourceName) {
+			return this.renderName(sourceName, matchStart, matchEnd, tagStart);
+		}
+		if (matchStart < 0 && matchEnd < 0) {
+			const localizedMatchStart = (-matchStart) - 1;
+			const localizedMatchEnd = (-matchEnd) - 1;
+			return <span title={sourceName}>{this.renderName(displayName, localizedMatchStart, localizedMatchEnd)}</span>;
+		}
+		return <span title={sourceName}>{displayName}</span>;
+	}
+
+	renderTypeIcon(type: string) {
+		return <span dangerouslySetInnerHTML={{ __html: Dex.getTypeIcon(type) }} />;
+	}
+
+	renderCategoryIcon(category: string) {
+		return <span dangerouslySetInnerHTML={{ __html: Dex.getCategoryIcon(category) }} />;
+	}
+
 	renderPokemonSortRow() {
 		const search = this.props.search;
 		const sortCol = search.sortCol;
@@ -60,6 +80,7 @@ export class PSSearchResults extends preact.Component<{
 		const search = this.props.search;
 		const pokemon = search.dex.species.get(id);
 		if (!pokemon) return <li class="result">Unrecognized pokemon</li>;
+		const displayName = Dex.getSpeciesDisplayName(pokemon);
 
 		let tagStart = (pokemon.forme ? pokemon.name.length - pokemon.forme.length - 1 : 0);
 
@@ -79,7 +100,7 @@ export class PSSearchResults extends preact.Component<{
 					<span class="pixelated" style={Dex.getPokemonIcon(pokemon.id)}></span>
 				</span>
 
-				<span class="col pokemonnamecol">{this.renderName(pokemon.name, matchStart, matchEnd, tagStart)}</span>
+				<span class="col pokemonnamecol">{this.renderDisplayName(pokemon.name, displayName, matchStart, matchEnd, tagStart)}</span>
 
 				{errorMessage}
 			</a></li>;
@@ -96,12 +117,10 @@ export class PSSearchResults extends preact.Component<{
 					<span class="pixelated" style={Dex.getPokemonIcon(pokemon.id)}></span>
 				</span>
 
-				<span class="col pokemonnamecol">{this.renderName(pokemon.name, matchStart, matchEnd, tagStart)}</span>
+				<span class="col pokemonnamecol">{this.renderDisplayName(pokemon.name, displayName, matchStart, matchEnd, tagStart)}</span>
 
 				<span class="col typecol">
-					{pokemon.types.map(type =>
-						<img src={`${Dex.resourcePrefix}sprites/types/${type}.png`} alt={type} height="14" width="32" class="pixelated" />
-					)}
+					{pokemon.types.map(type => this.renderTypeIcon(type))}
 				</span>
 
 				{search.dex.gen >= 3 && (
@@ -172,6 +191,7 @@ export class PSSearchResults extends preact.Component<{
 		const search = this.props.search;
 		const item = search.dex.items.get(id);
 		if (!item) return <li class="result">Unrecognized item</li>;
+		const displayName = Dex.getItemDisplayName(item);
 
 		return <li class="result"><a
 			href={`${this.URL_ROOT}items/${id}`} class={id === this.itemId ? 'cur' : ''}
@@ -181,7 +201,7 @@ export class PSSearchResults extends preact.Component<{
 				<span class="pixelated" style={Dex.getItemIcon(item)}></span>
 			</span>
 
-			<span class="col namecol">{id ? this.renderName(item.name, matchStart, matchEnd) : <i>(no item)</i>}</span>
+			<span class="col namecol">{id ? this.renderDisplayName(item.name, displayName, matchStart, matchEnd) : <i>(no item)</i>}</span>
 
 			{!!id && errorMessage}
 
@@ -193,13 +213,14 @@ export class PSSearchResults extends preact.Component<{
 		const search = this.props.search;
 		const ability = search.dex.abilities.get(id);
 		if (!ability) return <li class="result">Unrecognized ability</li>;
+		const displayName = Dex.getAbilityDisplayName(ability);
 
 		return <li class="result">
 			<a
 				href={`${this.URL_ROOT}abilities/${id}`} class={id === this.abilityId ? 'cur' : ''}
 				data-target="push" data-entry={`ability|${ability.name}`}
 			>
-				<span class="col namecol">{id ? this.renderName(ability.name, matchStart, matchEnd) : <i>(no ability)</i>}</span>
+				<span class="col namecol">{id ? this.renderDisplayName(ability.name, displayName, matchStart, matchEnd) : <i>(no ability)</i>}</span>
 
 				{errorMessage}
 
@@ -226,6 +247,7 @@ export class PSSearchResults extends preact.Component<{
 		const move = search.dex.moves.get(id);
 		const entry = slot ? `move|${move.name}|${slot}` : `move|${move.name}`;
 		if (!move) return <li class="result">Unrecognized move</li>;
+		const displayName = Dex.getMoveDisplayName(move);
 
 		const tagStart = (move.name.startsWith('Hidden Power') ? 12 : 0);
 
@@ -234,7 +256,7 @@ export class PSSearchResults extends preact.Component<{
 				href={`${this.URL_ROOT}moves/${id}`} class={this.moveIds.includes(id) ? 'cur' : ''}
 				data-target="push" data-entry={entry}
 			>
-				<span class="col movenamecol">{this.renderName(move.name, matchStart, matchEnd, tagStart)}</span>
+				<span class="col movenamecol">{this.renderDisplayName(move.name, displayName, matchStart, matchEnd, tagStart)}</span>
 
 				{errorMessage}
 			</a></li>;
@@ -246,17 +268,11 @@ export class PSSearchResults extends preact.Component<{
 			href={`${this.URL_ROOT}moves/${id}`} class={this.moveIds.includes(id) ? 'cur' : ''}
 			data-target="push" data-entry={entry}
 		>
-			<span class="col movenamecol">{this.renderName(move.name, matchStart, matchEnd, tagStart)}</span>
+			<span class="col movenamecol">{this.renderDisplayName(move.name, displayName, matchStart, matchEnd, tagStart)}</span>
 
 			<span class="col typecol">
-				<img
-					src={`${Dex.resourcePrefix}sprites/types/${encodeURIComponent(move.type)}.png`}
-					alt={move.type} height="14" width="32" class="pixelated"
-				/>
-				<img
-					src={`${Dex.resourcePrefix}sprites/categories/${move.category}.png`}
-					alt={move.category} height="14" width="32" class="pixelated"
-				/>
+				{this.renderTypeIcon(move.type)}
+				{this.renderCategoryIcon(move.category)}
 			</span>
 
 			<span class="col labelcol">
@@ -276,15 +292,13 @@ export class PSSearchResults extends preact.Component<{
 
 	renderTypeRow(id: ID, matchStart: number, matchEnd: number, errorMessage?: preact.ComponentChildren) {
 		const name = id.charAt(0).toUpperCase() + id.slice(1);
+		const displayName = Dex.getTypeDisplayName(name);
 
 		return <li class="result"><a href={`${this.URL_ROOT}types/${id}`} data-target="push" data-entry={`type|${name}`}>
-			<span class="col namecol">{this.renderName(name, matchStart, matchEnd)}</span>
+			<span class="col namecol">{this.renderDisplayName(name, displayName, matchStart, matchEnd)}</span>
 
 			<span class="col typecol">
-				<img
-					src={`${Dex.resourcePrefix}sprites/types/${encodeURIComponent(name)}.png`}
-					alt={name} height="14" width="32" class="pixelated"
-				/>
+				{this.renderTypeIcon(name)}
 			</span>
 
 			{errorMessage}
@@ -293,13 +307,14 @@ export class PSSearchResults extends preact.Component<{
 
 	renderCategoryRow(id: ID, matchStart: number, matchEnd: number, errorMessage?: preact.ComponentChildren) {
 		const name = id.charAt(0).toUpperCase() + id.slice(1);
+		const displayName = Dex.getCategoryDisplayName(name);
 
 		return <li class="result">
 			<a href={`${this.URL_ROOT}categories/${id}`} data-target="push" data-entry={`category|${name}`}>
-				<span class="col namecol">{this.renderName(name, matchStart, matchEnd)}</span>
+				<span class="col namecol">{this.renderDisplayName(name, displayName, matchStart, matchEnd)}</span>
 
 				<span class="col typecol">
-					<img src={`${Dex.resourcePrefix}sprites/categories/${name}.png`} alt={name} height="14" width="32" class="pixelated" />
+					{this.renderCategoryIcon(name)}
 				</span>
 
 				{errorMessage}

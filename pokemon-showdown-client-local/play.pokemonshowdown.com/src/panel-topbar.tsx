@@ -10,10 +10,13 @@
  */
 
 import preact from "../js/lib/preact";
-import { Config, PS, type PSRoom, type RoomID } from "./client-main";
+import { Config, PS, showdownSuiteLocalText, type PSRoom, type RoomID } from "./client-main";
 import { NARROW_MODE_HEADER_WIDTH, PSView, VERTICAL_HEADER_WIDTH } from "./panels";
 import type { Battle } from "./battle";
 import { BattleLog } from "./battle-log"; // optional
+
+const clientAssetBase = `${document.location.protocol !== 'http:' ? 'https:' : ''}//${Config.routes.client}`;
+const localText = (english: string, japanese: string) => showdownSuiteLocalText(english, japanese);
 
 window.addEventListener('dragover', e => {
 	// this prevents the bounce-back animation
@@ -203,13 +206,13 @@ export class PSHeader extends preact.Component {
 	}
 	renderUser() {
 		if (!PS.connection?.connected) {
-			return <button class="button" disabled><em>Offline</em></button>;
+			return <button class="button" disabled><em>{localText('Offline', 'オフライン')}</em></button>;
 		}
 		if (PS.user.initializing) {
-			return <button class="button" disabled><em>Connecting...</em></button>;
+			return <button class="button" disabled><em>{localText('Connecting...', '接続中...')}</em></button>;
 		}
 		if (!PS.user.named) {
-			return <a class="button" href="login">Choose name</a>;
+			return <a class="button" href="login">{localText('Choose name', '名前を決める')}</a>;
 		}
 		const userColor = window.BattleLog && `color:${PS.user.away ? '#888' : BattleLog.usernameColor(PS.user.userid)}`;
 		return <span class="username" style={userColor}>
@@ -225,7 +228,7 @@ export class PSHeader extends preact.Component {
 			<div class="scrollable-part">
 				<img
 					class="logo"
-					src={`https://${Config.routes.client}/favicon-256.png`}
+					src={`${clientAssetBase}/favicon-256.png`}
 					alt="Pokémon Showdown! (beta)"
 					width="50" height="50"
 				/>
@@ -266,7 +269,7 @@ export class PSHeader extends preact.Component {
 					<li>
 						<img
 							class="logo"
-							src={`https://${Config.routes.client}/favicon-256.png`}
+							src={`${clientAssetBase}/favicon-256.png`}
 							alt="Pokémon Showdown! (beta)"
 							width="48" height="48"
 						/>

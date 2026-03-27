@@ -313,10 +313,10 @@ export class BattleLog {
 						`<span class="picon" style="${Dex.getPokemonIcon(set.species)}"></span><br />${set.name}`));
 				} else {
 					buf = buf.replace(set.species,
-						`<span class="picon" style="${Dex.getPokemonIcon(set.species)}"></span><br />${set.species}`);
+						`<span class="picon" style="${Dex.getPokemonIcon(set.species)}"></span><br />${Dex.getSpeciesDisplayName(set.species)}`);
 				}
 				if (set.item) {
-					buf = buf.replace(set.item, `${set.item} <span class="itemicon" style="${Dex.getItemIcon(set.item)}"></span>`);
+					buf = buf.replace(set.item, `${Dex.getItemDisplayName(set.item)} <span class="itemicon" style="${Dex.getItemIcon(set.item)}"></span>`);
 				}
 				return buf;
 			}).join('');
@@ -1809,7 +1809,8 @@ export class BattleLog {
 		buf += '<div class="battle-log battle-log-inline"><div class="inner">' + battle.scene.log.elem.innerHTML + '</div></div>\n';
 		buf += '</div>\n';
 		buf += '<script>\n';
-		buf += `let daily = Math.floor(Date.now()/1000/60/60/24);document.write('<script src="https://${Config.routes.client}/js/replay-embed.js?version'+daily+'"></'+'script>');\n`;
+		const protocol = document.location.protocol !== 'http:' ? 'https:' : '';
+		buf += `let daily = Math.floor(Date.now()/1000/60/60/24);document.write('<script src="${protocol}//${Config.routes.client}/js/replay-embed.js?version'+daily+'"></'+'script>');\n`;
 		buf += '</script>\n';
 		return buf;
 	}
@@ -1825,7 +1826,8 @@ export class BattleLog {
 }
 
 if (window.Net) {
-	Net(`/config/colors.json?${Math.random()}`).get().then(response => {
+	const protocol = document.location.protocol !== 'http:' ? 'https:' : 'http:';
+	Net(`${protocol}//${Config.routes.client}/config/colors.json?${Math.random()}`).get().then(response => {
 		const data = JSON.parse(response);
 		Object.assign(Config.customcolors, data);
 	}).catch(() => {});

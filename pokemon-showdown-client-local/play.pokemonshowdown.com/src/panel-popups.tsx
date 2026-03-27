@@ -5,7 +5,7 @@ import { BattleLog } from "./battle-log";
 import { PSLoginServer } from "./client-connection";
 import { PSBackground } from "./client-core";
 import {
-	PS, PSRoom, Config, type RoomOptions, type PSLoginState, type RoomID, type TimestampOptions,
+	PS, PSRoom, Config, showdownSuiteLocalText, type RoomOptions, type PSLoginState, type RoomID, type TimestampOptions,
 } from "./client-main";
 import { type BattleRoom } from "./panel-battle";
 import { ChatUserList, type ChatRoom } from "./panel-chat";
@@ -35,6 +35,8 @@ export class UserRoom extends PSRoom {
 		if (this.userid) PS.send(`/cmd userdetails ${this.userid}`);
 	}
 }
+
+const localText = (english: string, japanese: string) => showdownSuiteLocalText(english, japanese);
 
 class UserPanel extends PSRoomPanel<UserRoom> {
 	static readonly id = 'user';
@@ -621,7 +623,7 @@ class OptionsPanel extends PSRoomPanel {
 		}
 		case 'language': {
 			PS.prefs.set(setting, elem.value);
-			PS.send(`/language ${elem.value}`);
+			PS.send(`/noreply /language ${elem.value}`);
 			break;
 		}
 		case 'tournaments': {
@@ -894,12 +896,14 @@ class LoginPanel extends PSRoomPanel {
 	override render() {
 		const room = this.props.room;
 		const loginState = room.args as PSLoginState;
+		const title = PS.server.registered ? localText('Log in', 'ログイン') : localText('Choose name', '名前を決める');
 		return <PSPanelWrapper room={room} width={280}><div class="pad">
-			<h3>Log in</h3>
+			<h3>{title}</h3>
 			<form onSubmit={this.handleSubmit}>
+				{!PS.server.registered && <p><small>{localText('This name stays inside this LAN setup.', 'この名前はローカル LAN 内だけで使われます。')}</small></p>}
 				{loginState?.error && <p class="error">{loginState.error}</p>}
 				<p><label class="label">
-					Username: <small class="preview" style={`color:${BattleLog.usernameColor(toID(this.getUsername()))}`}>(color)</small>
+					{localText('Username:', 'ユーザー名:')} <small class="preview" style={`color:${BattleLog.usernameColor(toID(this.getUsername()))}`}>(color)</small>
 					<input
 						class="textbox" type="text" name="username"
 						onInput={this.update} onChange={this.update} autocomplete="username"
@@ -907,12 +911,12 @@ class LoginPanel extends PSRoomPanel {
 					/>
 				</label></p>
 				{PS.user.named && !loginState && <p>
-					<small>(Others will be able to see your name change. To change name privately, use "Log out")</small>
+					<small>{localText('(Others will be able to see your name change. To change name privately, use "Log out")', '（接続中の他ユーザーには名前変更が見えます。切断して変えるなら「ログアウト」を使ってください）')}</small>
 				</p>}
 				{loginState?.needsPassword && <p>
-					<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>if you registered this name:</strong>
+					<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>{localText('if you registered this name:', 'この名前を登録済みなら:')}</strong>
 					<label class="label">
-						Password: {}
+						{localText('Password:', 'パスワード:')} {}
 						<input
 							class="textbox" type={this.state.passwordShown ? 'text' : 'password'} name="password"
 							autocomplete="current-password" style="width:173px"
@@ -924,35 +928,35 @@ class LoginPanel extends PSRoomPanel {
 					</label>
 				</p>}
 				{loginState?.needsGoogle && <>
-					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>if you registered this name:</strong></p>
+					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>{localText('if you registered this name:', 'この名前を登録済みなら:')}</strong></p>
 					<p><GooglePasswordBox name={this.getUsername()} /></p>
 				</>}
 				<p class="buttonbar">
 					{PS.user.loggingIn ? (
-						<button disabled class="cur">Logging in...</button>
+						<button disabled class="cur">{localText('Logging in...', 'ログイン中...')}</button>
 					) : loginState?.needsPassword ? (
 						<>
-							<button type="submit" class="button"><strong>Log in</strong></button> {}
-							<button type="button" onClick={this.reset} class="button">Cancel</button>
+							<button type="submit" class="button"><strong>{localText('Log in', 'ログイン')}</strong></button> {}
+							<button type="button" onClick={this.reset} class="button">{localText('Cancel', 'キャンセル')}</button>
 						</>
 					) : loginState?.needsGoogle ? (
-						<button type="button" onClick={this.reset} class="button">Cancel</button>
+						<button type="button" onClick={this.reset} class="button">{localText('Cancel', 'キャンセル')}</button>
 					) : (
 						<>
-							<button type="submit" class="button"><strong>Choose name</strong></button> {}
-							<button type="button" name="closeRoom" class="button">Cancel</button>
+							<button type="submit" class="button"><strong>{localText('Choose name', '名前を決める')}</strong></button> {}
+							<button type="button" name="closeRoom" class="button">{localText('Cancel', 'キャンセル')}</button>
 						</>
 					)} {}
 				</p>
 				{loginState?.name && <div>
 					<p>
-						<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>if not:</strong>
+						<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>{localText('if not:', '違うなら:')}</strong>
 					</p>
 					<p style={{ maxWidth: '210px', margin: '0 auto' }}>
-						This is someone else's account. Sorry.
+						{localText("This is someone else's account. Sorry.", 'これは他の人のアカウント名です。')}
 					</p>
 					<p class="buttonbar">
-						<button class="button" onClick={this.reset}>Try another name</button>
+						<button class="button" onClick={this.reset}>{localText('Try another name', '別の名前を試す')}</button>
 					</p>
 				</div>}
 			</form>

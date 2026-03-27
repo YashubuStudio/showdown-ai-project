@@ -8,6 +8,7 @@ LOG_FILE="$ROOT_DIR/logs/lan-server.log"
 source "$ROOT_DIR/scripts/lib-lan-process.sh"
 
 mkdir -p "$RUNTIME_DIR" "$ROOT_DIR/logs"
+: > "$LOG_FILE"
 
 if PID="$(read_pid_file "$PID_FILE" 2>/dev/null)"; then
 	if lan_marker_matches "$PID" "server" "$ROOT_DIR"; then
@@ -22,6 +23,7 @@ cd "$ROOT_DIR"
 : "${PS_PORT:=8000}"
 : "${PS_BIND_ADDRESS:=0.0.0.0}"
 : "${PS_CLIENT_PORT:=8080}"
+: "${PS_LAN_PROFILE:=lightweight}"
 
 if [[ ! -f "$ROOT_DIR/dist/server/index.js" ]]; then
 	echo "Building server bundle..."
@@ -30,17 +32,20 @@ fi
 
 setsid bash -lc "
 	cd \"$ROOT_DIR\"
-	exec env \
+	env \
 		SHOWDOWN_SUITE_LAN_ROLE=server \
 		SHOWDOWN_SUITE_ROOT=\"$ROOT_DIR\" \
 		PS_PORT=\"$PS_PORT\" \
 		PS_BIND_ADDRESS=\"$PS_BIND_ADDRESS\" \
 		PS_CLIENT_PORT=\"$PS_CLIENT_PORT\" \
-		./pokemon-showdown start --skip-build \"$PS_PORT\" \
-		>>\"$LOG_FILE\" 2>&1
+		PS_LAN_PROFILE=\"$PS_LAN_PROFILE\" \
+		./pokemon-showdown start --skip-build \"$PS_PORT\" 2>&1 | \
+		grep -vE '^(Worker [0-9]+ now listening on|Test your server at http://)' \
+		>>\"$LOG_FILE\"
 " >/dev/null 2>&1 &
 
-echo $! > "$PID_FILE"
+LAUNCHER_PID=$!
+echo "$LAUNCHER_PID" > "$PID_FILE"
 
 HOST_TO_CHECK="$(lan_check_host "$PS_BIND_ADDRESS")"
 if ! wait_for_tcp "$HOST_TO_CHECK" "$PS_PORT" 20; then
@@ -56,4 +61,9 @@ if ! wait_for_tcp "$HOST_TO_CHECK" "$PS_PORT" 20; then
 	exit 1
 fi
 
-echo "LAN server started on ${PS_BIND_ADDRESS}:${PS_PORT}"
+SERVER_PID="$(pgrep -P "$LAUNCHER_PID" -f "node ./pokemon-showdown start --skip-build $PS_PORT" | head -n 1 || true)"
+if [[ -n "$SERVER_PID" ]]; then
+	echo "$SERVER_PID" > "$PID_FILE"
+fi
+
+echo "LAN server started on ${PS_BIND_ADDRESS}:${PS_PORT} (${PS_LAN_PROFILE})"

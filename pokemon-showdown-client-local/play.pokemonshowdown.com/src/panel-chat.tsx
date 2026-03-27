@@ -7,7 +7,7 @@
 
 import preact from "../js/lib/preact";
 import type { PSSubscription } from "./client-core";
-import { PS, PSRoom, type RoomOptions, type RoomID, type Team } from "./client-main";
+import { PS, PSRoom, isShowdownSuiteLocalMode, type RoomOptions, type RoomID, type Team } from "./client-main";
 import { PSView, PSPanelWrapper, PSRoomPanel } from "./panels";
 import { TeamForm } from "./panel-mainmenu";
 import { BattleLog } from "./battle-log";
@@ -384,6 +384,9 @@ export class ChatRoom extends PSRoom {
 			}
 		},
 		'rank,ranking,rating,ladder'(target) {
+			if (isShowdownSuiteLocalMode()) {
+				return this.add(`|error|ローカルモードでは公開 ladder 情報は使用できません。`);
+			}
 			let arg = target;
 			if (!arg) {
 				arg = PS.user.userid;

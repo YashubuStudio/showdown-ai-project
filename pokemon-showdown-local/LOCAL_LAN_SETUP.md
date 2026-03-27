@@ -58,10 +58,11 @@ Then reconnect with that username.
 Replace the IP if your machine has a different LAN address:
 
 ```text
-http://YOUR_LAN_IP:8080/play.pokemonshowdown.com/testclient.html?~~YOUR_LAN_IP:8000
+http://YOUR_LAN_IP:8080/play.pokemonshowdown.com/lan.html?~~YOUR_LAN_IP:8000&serverid=koharulocal
 ```
 
 The server landing page at `http://YOUR_LAN_IP:8000` also links to the correct client URL.
+`lan.html` is intended for private LAN use and avoids the public testclient login flow.
 
 ## Notes for AI work
 

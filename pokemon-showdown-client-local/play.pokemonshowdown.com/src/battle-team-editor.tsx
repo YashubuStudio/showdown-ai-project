@@ -614,7 +614,7 @@ export class TeamEditorState extends PSModel {
 		return { minAtk, minSpe };
 	}
 	getNickname(set: Dex.PokemonSet) {
-		return set.name || this.dex.species.get(set.species).baseSpecies || '';
+		return set.name || Dex.getSpeciesDisplayName(this.dex.species.get(set.species).baseSpecies) || '';
 	}
 	canHyperTrain(set: Dex.PokemonSet) {
 		let format: string = this.format;
@@ -838,8 +838,9 @@ export class TeamEditorState extends PSModel {
 			return;
 		}
 		if (!(formatid in this._sampleSetPromises)) {
+			const protocol = document.location.protocol !== 'http:' ? 'https:' : '';
 			this._sampleSetPromises[formatid] = Net(
-				`https://${Config.routes.client}/data/sets/${formatid}.json`
+				`${protocol}//${Config.routes.client}/data/sets/${formatid}.json`
 			).get().then(json => {
 				const data = JSON.parse(json);
 				TeamEditorState.sampleSets[formatid] = data;
@@ -1973,6 +1974,7 @@ class TeamWizard extends preact.Component<{
 			editor.readonly || (editor.innerFocus?.type === t && editor.innerFocus.setIndex === i) ? ' cur' : ''
 		);
 		const species = editor.dex.species.get(set.species);
+		const speciesDisplay = Dex.getSpeciesDisplayName(species);
 		const isCur = TeamEditorState.clipboard?.teams?.[editor.team.key]?.sets[i] ? ' cur' : '';
 		return <div class={`set-button${isCur}`}>
 			<div style="text-align:right">
@@ -1994,7 +1996,7 @@ class TeamWizard extends preact.Component<{
 						<button class={`button button-first${cur('pokemon')}`} onClick={this.setFocus} value={`pokemon|${i}`}>
 							<span class="sprite" style={sprite}><span class="sprite-inner">
 								<strong class="label">Pokemon</strong> {}
-								{set.species}
+								{speciesDisplay}
 							</span></span>
 						</button>
 					</div></td>
@@ -2035,7 +2037,10 @@ class TeamWizard extends preact.Component<{
 							<strong class="label">Moves</strong> {}
 							{set.moves.map((move, mi) => <div>
 								{!editor.narrow && <small class="gray">&bull;</small>}
-								{mi >= 4 ? <span class="message-error">{move || (editor.narrow && '-') || ''}</span> : move || (editor.narrow && '-')}
+								{mi >= 4 ?
+									<span class="message-error">{move ? Dex.getMoveDisplayName(move) : ((editor.narrow && '-') || '')}</span> :
+									(move ? Dex.getMoveDisplayName(move) : (editor.narrow && '-'))
+								}
 							</div>)}
 							{!set.moves.length && <em>(no moves)</em>}
 						</button>
@@ -2051,7 +2056,7 @@ class TeamWizard extends preact.Component<{
 						<button class={`button button-middle${cur('ability')}`} onClick={this.setFocus} value={`ability|${i}`}>
 							{(editor.gen >= 3 || set.ability) && <>
 								<strong class="label">Ability</strong> {}
-								{(set.ability !== 'No Ability' && set.ability) ||
+								{(set.ability !== 'No Ability' && set.ability && Dex.getAbilityDisplayName(set.ability)) ||
 									(!set.ability ? <em>(choose ability)</em> : <em>(no ability)</em>)}
 							</>}
 						</button>
@@ -2061,7 +2066,7 @@ class TeamWizard extends preact.Component<{
 							{(editor.gen >= 2 || set.item) && <>
 								{set.item && <PSIcon item={set.item} />}
 								<strong class="label">Item</strong> {}
-								{set.item || <em>(no item)</em>}
+								{(set.item && Dex.getItemDisplayName(set.item)) || <em>(no item)</em>}
 							</>}
 						</button>
 					</div></td>
@@ -3199,7 +3204,7 @@ class DetailsForm extends preact.Component<{
 									style={{ padding: '2px' }} onClick={this.selectSprite}
 								>
 									<PSIcon pokemon={{ species: sp.name } as Dex.PokemonSet} />
-									<br />{sp.forme || sp.baseForme || sp.baseSpecies}
+									<br />{Dex.getSpeciesDisplayName(sp.name)}
 								</button>;
 							});
 						})()}

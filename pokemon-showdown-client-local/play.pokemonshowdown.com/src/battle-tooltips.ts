@@ -633,7 +633,7 @@ export class BattleTooltips {
 			});
 		}
 
-		text += `<h2>${move.name}<br />`;
+		text += `<h2>${Dex.getMoveDisplayName(move)}<br />`;
 
 		text += Dex.getTypeIcon(moveType);
 		text += ` ${Dex.getCategoryIcon(category)}</h2>`;
@@ -654,7 +654,7 @@ export class BattleTooltips {
 				basePower = `${value}`;
 				if (prevBasePower === null) prevBasePower = basePower;
 				if (prevBasePower !== basePower) difference = true;
-				basePowers.push(`Base power vs ${active.name}: ${basePower}`);
+				basePowers.push(`Base power vs ${Dex.getPokemonDisplayName(active)}: ${basePower}`);
 			}
 			if (difference) {
 				text += '<p>' + basePowers.join('<br />') + '</p>';
@@ -693,7 +693,7 @@ export class BattleTooltips {
 				calls = 'Swift';
 			}
 			let calledMove = this.battle.dex.moves.get(calls);
-			text += `Calls ${Dex.getTypeIcon(this.getMoveType(calledMove, value)[0])} ${calledMove.name}`;
+			text += `Calls ${Dex.getTypeIcon(this.getMoveType(calledMove, value)[0])} ${Dex.getMoveDisplayName(calledMove)}`;
 		}
 
 		text += `<p>Accuracy: ${accuracy}</p>`;
@@ -831,10 +831,11 @@ export class BattleTooltips {
 		}
 
 		const ignoreNicks = this.battle.ignoreNicks || this.battle.ignoreOpponent;
-		const nickname = ignoreNicks ? Dex.species.get(pokemon.speciesForme).baseSpecies : pokemon.name;
+		const nickname = ignoreNicks ? Dex.getSpeciesDisplayName(Dex.species.get(pokemon.speciesForme).baseSpecies) : Dex.getPokemonDisplayName(pokemon);
 		let name = BattleLog.escapeHTML(nickname);
-		if (pokemon.speciesForme !== nickname) {
-			name += ` <small>(${BattleLog.escapeHTML(pokemon.speciesForme)})</small>`;
+		const speciesDisplayName = Dex.getSpeciesDisplayName(pokemon.speciesForme);
+		if (speciesDisplayName && speciesDisplayName !== nickname) {
+			name += ` <small>(${BattleLog.escapeHTML(speciesDisplayName)})</small>`;
 		}
 
 		let levelBuf = (pokemon.level !== 100 ? ` <small>L${pokemon.level}</small>` : ``);
@@ -921,10 +922,10 @@ export class BattleTooltips {
 			let itemEffect = '';
 			if (clientPokemon?.prevItem) {
 				item = 'None';
-				let prevItem = this.battle.dex.items.get(clientPokemon.prevItem).name;
+				let prevItem = Dex.getItemDisplayName(this.battle.dex.items.get(clientPokemon.prevItem));
 				itemEffect += clientPokemon.prevItemEffect ? prevItem + ' was ' + clientPokemon.prevItemEffect : 'was ' + prevItem;
 			}
-			if (serverPokemon.item) item = this.battle.dex.items.get(serverPokemon.item).name;
+			if (serverPokemon.item) item = Dex.getItemDisplayName(this.battle.dex.items.get(serverPokemon.item));
 			if (itemEffect) itemEffect = ' (' + itemEffect + ')';
 			if (item) itemText = '<small>Item:</small> ' + item + itemEffect;
 		} else if (clientPokemon) {
@@ -933,10 +934,10 @@ export class BattleTooltips {
 			if (clientPokemon.prevItem) {
 				item = 'None';
 				if (itemEffect) itemEffect += '; ';
-				let prevItem = this.battle.dex.items.get(clientPokemon.prevItem).name;
+				let prevItem = Dex.getItemDisplayName(this.battle.dex.items.get(clientPokemon.prevItem));
 				itemEffect += clientPokemon.prevItemEffect ? prevItem + ' was ' + clientPokemon.prevItemEffect : 'was ' + prevItem;
 			}
-			if (pokemon.item) item = this.battle.dex.items.get(pokemon.item).name;
+			if (pokemon.item) item = Dex.getItemDisplayName(this.battle.dex.items.get(pokemon.item));
 			if (itemEffect) itemEffect = ' (' + itemEffect + ')';
 			if (item) itemText = '<small>Item:</small> ' + item + itemEffect;
 		}
@@ -960,10 +961,12 @@ export class BattleTooltips {
 			const battlePokemon = clientPokemon || this.battle.findCorrespondingPokemon(pokemon);
 			for (const moveid of serverPokemon.moves) {
 				const move = this.battle.dex.moves.get(moveid);
-				let moveName = `&#8226; ${move.name}`;
+				let moveName = `&#8226; ${Dex.getMoveDisplayName(move)}`;
 				if (battlePokemon?.moveTrack) {
 					for (const row of battlePokemon.moveTrack) {
-						if (moveName === row[0]) {
+						let trackedMoveName = row[0];
+						if (trackedMoveName.startsWith('*')) trackedMoveName = trackedMoveName.slice(1);
+						if (move.name === trackedMoveName) {
 							moveName = this.getPPUseText(row, true);
 							break;
 						}
@@ -977,7 +980,7 @@ export class BattleTooltips {
 			text += `<p class="tooltip-section">`;
 			for (const [moveName] of clientPokemon.moveTrack) {
 				const move = this.battle.dex.moves.get(moveName);
-				text += `&#8226; ${move.name}<br />`;
+				text += `&#8226; ${Dex.getMoveDisplayName(move)}<br />`;
 			}
 			text += `</p>`;
 		} else if (!this.battle.hardcoreMode && clientPokemon?.moveTrack.length) {
@@ -1487,16 +1490,16 @@ export class BattleTooltips {
 		}
 		const bullet = moveName.startsWith('*') || move.isZ ? '<span style="color:#888">&#8226;</span>' : '&#8226;';
 		if (ppUsed === Infinity) {
-			return `${bullet} ${move.name} <small>(0/${maxpp})</small>`;
+			return `${bullet} ${Dex.getMoveDisplayName(move)} <small>(0/${maxpp})</small>`;
 		}
 		if (ppUsed || moveName.startsWith('*')) {
 			if (typeof ppUsed === 'number') {
-				return `${bullet} ${move.name} <small>(${maxpp - ppUsed}/${maxpp})</small>`;
+				return `${bullet} ${Dex.getMoveDisplayName(move)} <small>(${maxpp - ppUsed}/${maxpp})</small>`;
 			} else {
-				return `${bullet} ${move.name} <small>(${maxpp - ppUsed[0]}/${maxpp} to ${maxpp - ppUsed[1]}/${maxpp})</small>`;
+				return `${bullet} ${Dex.getMoveDisplayName(move)} <small>(${maxpp - ppUsed[0]}/${maxpp} to ${maxpp - ppUsed[1]}/${maxpp})</small>`;
 			}
 		}
-		return `${bullet} ${move.name} ${showKnown ? ' <small>(revealed)</small>' : ''}`;
+		return `${bullet} ${Dex.getMoveDisplayName(move)} ${showKnown ? ' <small>(revealed)</small>' : ''}`;
 	}
 
 	ppUsed(move: Dex.Move, pokemon: Pokemon) {
@@ -2553,12 +2556,12 @@ export class BattleTooltips {
 		if (!isActive) {
 			// for switch tooltips, only show the original ability
 			const ability = abilityData.baseAbility || abilityData.ability;
-			if (ability) text = '<small>Ability:</small> ' + this.battle.dex.abilities.get(ability).name;
+			if (ability) text = '<small>Ability:</small> ' + Dex.getAbilityDisplayName(this.battle.dex.abilities.get(ability));
 		} else {
 			if (abilityData.ability) {
-				const abilityName = this.battle.dex.abilities.get(abilityData.ability).name;
+				const abilityName = Dex.getAbilityDisplayName(this.battle.dex.abilities.get(abilityData.ability));
 				text = '<small>Ability:</small> ' + abilityName;
-				const baseAbilityName = this.battle.dex.abilities.get(abilityData.baseAbility).name;
+				const baseAbilityName = Dex.getAbilityDisplayName(this.battle.dex.abilities.get(abilityData.baseAbility));
 				if (baseAbilityName && baseAbilityName !== abilityName) text += ' (base: ' + baseAbilityName + ')';
 			}
 		}

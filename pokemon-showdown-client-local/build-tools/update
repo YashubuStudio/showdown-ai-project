@@ -13,10 +13,14 @@ const fs = require('fs');
 const crypto = require('crypto');
 const child_process = require('child_process');
 const compiler = require('./compiler');
+const {resolveShowdownRoot, showdownSourcePath} = require('./showdown-source');
 
 const thisDir = __dirname;
 const rootDir = path.resolve(thisDir, '..');
 process.chdir(rootDir);
+const showdownRoot = resolveShowdownRoot();
+const showdownChatFormatterPath = path.relative(rootDir, showdownSourcePath(showdownRoot, 'server/chat-formatter.ts'));
+const showdownTeamsPath = path.relative(rootDir, showdownSourcePath(showdownRoot, 'sim/teams.ts'));
 
 const AUTOCONFIG_START = '/*** Begin automatically generated configuration ***/';
 const AUTOCONFIG_END = '/*** End automatically generated configuration ***/';
@@ -89,7 +93,7 @@ const compileOpts = Object.assign(eval('(' + fs.readFileSync('.babelrc') + ')'),
 if (process.argv[2] === 'full') {
 	delete compileOpts.ignore;
 	compiler.compileToDir(
-		['caches/pokemon-showdown/server/chat-formatter.ts', 'caches/pokemon-showdown/sim/teams.ts'],
+		[showdownChatFormatterPath, showdownTeamsPath],
 		'play.pokemonshowdown.com/js/server/',
 		compileOpts
 	);
@@ -117,7 +121,7 @@ try {
 			'play.pokemonshowdown.com/src/battle-dex-data.ts',
 			'play.pokemonshowdown.com/src/battle-log.ts',
 			'play.pokemonshowdown.com/src/battle-log-misc.js',
-			'caches/pokemon-showdown/server/chat-formatter.ts',
+			showdownChatFormatterPath,
 			'play.pokemonshowdown.com/data/text.js',
 			'play.pokemonshowdown.com/data/text-afd.js',
 			'play.pokemonshowdown.com/src/battle-text-parser.ts',

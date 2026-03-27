@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0" />
+	<title>Showdown LAN ローカルクライアント</title>
+	<link rel="shortcut icon" href="favicon.ico" id="dynamic-favicon" />
+	<link rel="stylesheet" href="style/battle.css" />
+	<link rel="stylesheet" href="style/client2.css" />
+	<link rel="stylesheet" href="style/teambuilder.css" />
+	<meta name="robots" content="noindex" />
+	<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+	<!--[if lte IE 8]><script>
+		window.Config = {"oldie": true};
+	</script><![endif]-->
+	<script>
+		(function () {
+			const params = new URLSearchParams(window.location.search);
+			let host = window.location.hostname;
+			let port = 8000;
+			let protocol = params.get('protocol') === 'https' ? 'https' : 'http';
+			let serverid = params.get('serverid') || 'koharulocal';
+
+			const shorthand = /\?~~(([^:\/?&]+)(:[0-9]+)?)/.exec(window.location.search);
+			if (shorthand) {
+				host = shorthand[2] || host;
+				if (shorthand[3]) port = Number(shorthand[3].slice(1)) || port;
+			}
+
+			if (params.get('host')) host = params.get('host') || host;
+			if (params.get('port')) port = Number(params.get('port')) || port;
+			if (params.get('serverid')) serverid = params.get('serverid') || serverid;
+
+			window.SHOWDOWN_SUITE_LOCAL_CONFIG = {
+				enabled: true,
+				debugNetLog: false,
+				usernameKey: `showdown_suite_local_username:${serverid}`,
+				server: {
+					id: serverid,
+					host,
+					port,
+					httpport: port,
+					altport: 80,
+					prefix: '/showdown',
+					protocol,
+					registered: false,
+				},
+			};
+		})();
+	</script>
+</head><body>
+	<div id="ps-frame">
+		<div id="header" class="header">
+			<div class="maintabbarbottom"></div>
+			<img class="logo" src="favicon-256.png" alt="Pokémon Showdown LAN" width="50" height="50">
+		</div>
+		<div class="ps-room scrollable" id="room-">
+			<div class="mainmenu-mini-windows">
+				<div class="mini-window" data-roomid="news">
+					<h3 class="mini-window-header"><button class="closebutton" tabindex="-1" aria-label="Close"><i class="fa fa-times-circle"></i></button>LAN</h3>
+					<div id="room-news" class="mini-window-contents ps-room-light scrollable" style="height: auto;" data-newsid="0">
+						<div class="readable-bg">
+							ローカル LAN 専用クライアントです。名前と接続先はこのネットワーク内だけで扱います。
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="mainmenu">
+				<div id="loading-message" class="mainmessage">Loading... <noscript>FAILED<br /><br />Pok&eacute;mon Showdown requires JavaScript.</noscript></div>
+			</div>
+			<div class="mainmenufooter">
+				<small>Local LAN client for Showdown Suite</small>
+			</div>
+		</div>
+	</div>
+	<script>
+		function linkStyle(url) {
+			var linkEl = document.createElement('link');
+			linkEl.rel = 'stylesheet';
+			linkEl.href = url;
+			document.head.appendChild(linkEl);
+		}
+		linkStyle("style/sim-types.css");
+		linkStyle("style/utilichart.css");
+		linkStyle("style/battle-search.css");
+		linkStyle("style/font-awesome.css");
+	</script>
+	<script nomodule defer src="js/lib/ps-polyfill.js"></script>
+	<script src="config/config.js"></script>
+	<script>
+		(function () {
+			const local = window.SHOWDOWN_SUITE_LOCAL_CONFIG;
+			if (!window.Config || !local) return;
+			const host = window.location.host;
+			Config.testclient = false;
+			Config.routes.root = host;
+			Config.routes.client = host + '/play.pokemonshowdown.com';
+			Config.routes.dex = host;
+			Config.routes.replays = host;
+			Config.routes.users = host;
+			Config.routes.teams = host;
+			Config.defaultserver = {...local.server};
+			Config.server = {...local.server};
+		})();
+	</script>
+	<script defer src="js/client-core.js"></script>
+
+	<script defer src="js/battle-dex-data.js"></script>
+	<script defer src="js/battle-dex.js"></script>
+	<script defer src="js/battle-teams.js"></script>
+	<script defer src="js/battle-text-parser.js"></script>
+	<script defer src="js/client-main.js"></script>
+	<script nomodule defer src="js/lib/sockjs-1.4.0-nwjsfix.min.js"></script>
+	<script defer src="js/client-connection.js"></script>
+
+	<script defer src="js/lib/preact.min.js"></script>
+	<script defer src="js/panels.js"></script>
+	<script defer src="js/panel-mainmenu.js"></script>
+	<script defer src="js/panel-rooms.js"></script>
+	<script defer src="js/panel-topbar.js"></script>
+
+	<script defer src="js/lib/html-css-sanitizer-minified.js"></script>
+	<script defer src="src/battle-log-misc.js"></script>
+	<script defer src="js/server/chat-formatter.js"></script>
+	<script defer src="js/battle-log.js"></script>
+
+	<script defer src="js/miniedit.js"></script>
+	<script defer src="js/panel-chat-tournament.js"></script>
+	<script defer src="js/panel-chat.js"></script>
+
+	<script defer src="js/panel-popups.js"></script>
+	<script defer src="js/panel-page.js"></script>
+	<script defer src="js/panel-ladder.js"></script>
+	<script defer src="js/panel-resources.js"></script>
+
+	<script defer src="js/battle-sound.js"></script>
+	<script defer src="js/lib/jquery-2.2.4.min.js"></script>
+	<script defer src="data/graphics.js"></script>
+	<script defer src="data/text.js"></script>
+	<script defer src="data/text-afd.js"></script>
+	<script defer src="js/battle-tooltips.js"></script>
+	<script defer src="js/battle.js"></script>
+	<script defer src="js/battle-choices.js"></script>
+	<script defer src="js/panel-battle.js"></script>
+
+	<script defer src="data/pokedex.js"></script>
+	<script defer src="data/moves.js"></script>
+	<script defer src="data/items.js"></script>
+	<script defer src="data/abilities.js"></script>
+	<script defer src="data/translations-ja.js"></script>
+
+	<script defer src="data/search-index.js"></script>
+	<script defer src="data/teambuilder-tables.js"></script>
+	<script defer src="js/panel-teamdropdown.js"></script>
+	<script defer src="js/panel-teambuilder.js"></script>
+	<script defer src="js/battle-dex-search.js"></script>
+	<script defer src="js/battle-searchresults.js"></script>
+	<script defer src="js/battle-team-editor.js"></script>
+	<script defer src="js/panel-teambuilder-team.js"></script>
+	<script defer src="js/search.js"></script>
+
+	<script defer src="data/pokedex-mini.js"></script>
+	<script defer src="data/pokedex-mini-bw.js"></script>
+	<script defer src="data/typechart.js"></script>
+	<script defer src="data/aliases.js"></script>
+	<script defer src="js/lib/d3.v3.min.js"></script>
+	<script defer src="js/lib/color-thief.min.js"></script>
+	<script defer src="data/commands.js"></script>
+	<script defer src="js/client-endload.js"></script>
+</body></html>

@@ -13,12 +13,14 @@
 
 const path = require('path');
 const fs = require('fs');
+const {resolveShowdownRoot, showdownDistPath} = require('./showdown-source');
 
 const thisFile = __filename;
 const thisDir = __dirname;
 const rootDir = path.resolve(thisDir, '../play.pokemonshowdown.com');
 
-const Dex = require('../caches/pokemon-showdown/dist/sim/dex').Dex;
+const showdownRoot = resolveShowdownRoot();
+const Dex = require(showdownDistPath(showdownRoot, 'sim/dex.js')).Dex;
 const toID = Dex.toID;
 
 function updateLearnsets(callback) {

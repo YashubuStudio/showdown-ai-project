@@ -17,7 +17,10 @@ stop_pid() {
 
 	local pid
 	pid="$(cat "$pid_file")"
-	if lan_marker_matches "$pid" "$role" "$ROOT_DIR"; then
+	if ! lan_marker_matches "$pid" "$role" "$ROOT_DIR"; then
+		pid="$(lan_find_pid_by_marker "$role" "$ROOT_DIR" 2>/dev/null || true)"
+	fi
+	if [[ -n "$pid" ]] && lan_marker_matches "$pid" "$role" "$ROOT_DIR"; then
 		local pgid
 		pgid="$(lan_process_group "$pid")"
 		if [[ -n "$pgid" ]]; then

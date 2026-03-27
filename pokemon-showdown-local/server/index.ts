@@ -121,7 +121,9 @@ function setupGlobals() {
 
 	const { IPTools } = require('./ip-tools');
 	global.IPTools = IPTools;
-	void IPTools.loadHostsAndRanges();
+	if (process.env.PS_LAN_PROFILE !== 'lightweight') {
+		void IPTools.loadHostsAndRanges();
+	}
 
 	const TeamValidatorAsync = require('./team-validator-async');
 	global.TeamValidatorAsync = TeamValidatorAsync;

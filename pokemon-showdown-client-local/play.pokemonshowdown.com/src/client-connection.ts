@@ -10,6 +10,16 @@ import { Config, PS } from "./client-main";
 declare const SockJS: any;
 declare const POKEMON_SHOWDOWN_TESTCLIENT_KEY: string | undefined;
 
+function isShowdownSuiteLocalClient() {
+	return !!(window as any).SHOWDOWN_SUITE_LOCAL_CONFIG?.enabled ||
+		Config.server?.registered === false ||
+		Config.defaultserver?.registered === false;
+}
+
+function shouldLogConnectionEvents() {
+	return (window as any).SHOWDOWN_SUITE_LOCAL_CONFIG?.debugNetLog === true;
+}
+
 export class PSConnection {
 	socket: WebSocket | null = null;
 	connected = false;
@@ -58,7 +68,7 @@ export class PSConnection {
 		}
 
 		try {
-			const worker = new Worker('/js/client-connection-worker.js');
+			const worker = new Worker(new URL('js/client-connection-worker.js', window.location.href));
 			this.worker = worker;
 
 			worker.postMessage({ type: 'connect', server: PS.server });
@@ -67,7 +77,7 @@ export class PSConnection {
 				const { type, data } = event.data;
 				switch (type) {
 				case 'connected':
-					console.log('\u2705 (CONNECTED via worker)');
+					if (shouldLogConnectionEvents()) console.log('\u2705 (CONNECTED via worker)');
 					this.connected = true;
 					this.queue.forEach(msg => worker.postMessage({ type: 'send', data: msg }));
 					this.queue = [];
@@ -119,7 +129,7 @@ export class PSConnection {
 		const socket = this.socket!;
 
 		socket.onopen = () => {
-			console.log('\u2705 (CONNECTED)');
+			if (shouldLogConnectionEvents()) console.log('\u2705 (CONNECTED)');
 			this.connected = true;
 			this.reconnectDelay = 1000;
 			this.queue.forEach(msg => socket.send(msg));
@@ -132,9 +142,9 @@ export class PSConnection {
 		};
 
 		socket.onclose = () => {
-			console.log('\u274C (DISCONNECTED)');
+			if (shouldLogConnectionEvents()) console.log('\u274C (DISCONNECTED)');
 			this.handleDisconnect();
-			console.log('\u2705 (DISCONNECTED)');
+			if (shouldLogConnectionEvents()) console.log('\u2705 (DISCONNECTED)');
 			this.connected = false;
 			PS.isOffline = true;
 			for (const roomid in PS.rooms) {
@@ -228,6 +238,11 @@ export class PSStorage {
 		if (this.loaded) {
 			if (this.loaded === true) return;
 			return this.loaded;
+		}
+		if (isShowdownSuiteLocalClient()) {
+			Config.server ||= Config.defaultserver;
+			Object.assign(PS.server, Config.server);
+			return;
 		}
 		if (Config.testclient) {
 			return;
@@ -392,6 +407,9 @@ PSConnection.connect();
 
 export const PSLoginServer = new class {
 	rawQuery(act: string, data: PostData): Promise<string | null> {
+		if (isShowdownSuiteLocalClient()) {
+			return Promise.resolve(null);
+		}
 		// commenting out because for some reason this is working in Chrome????
 		// if (location.protocol === 'file:') {
 		// 	alert("Sorry, login server queries don't work in the testclient. To log in, see README.md to set up testclient-key.js");

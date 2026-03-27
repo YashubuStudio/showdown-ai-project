@@ -9,9 +9,13 @@ show_status() {
 	local name="$1"
 	local pid_file="$2"
 	local role="$3"
+	local pid=""
 
-	if PID="$(read_pid_file "$pid_file" 2>/dev/null)" && lan_marker_matches "$PID" "$role" "$ROOT_DIR"; then
-		echo "$name: running (PID $PID)"
+	if pid="$(read_pid_file "$pid_file" 2>/dev/null)" && lan_marker_matches "$pid" "$role" "$ROOT_DIR"; then
+		echo "$name: running (PID $pid)"
+	elif pid="$(lan_find_pid_by_marker "$role" "$ROOT_DIR" 2>/dev/null)"; then
+		echo "$pid" > "$pid_file"
+		echo "$name: running (PID $pid)"
 	else
 		echo "$name: stopped"
 	fi

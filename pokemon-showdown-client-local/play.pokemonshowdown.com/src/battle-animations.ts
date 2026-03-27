@@ -21,6 +21,10 @@ import { BattleNatures } from './battle-dex-data';
 import { BattleTooltips } from './battle-tooltips';
 import { BattleTextParser, type Args, type KWArgs } from './battle-text-parser';
 
+function isShowdownSuiteLocalAssetMode() {
+	return !!window.SHOWDOWN_SUITE_LOCAL_CONFIG?.enabled;
+}
+
 /*
 
 Most of this file is: CC0 (public domain)
@@ -152,7 +156,11 @@ export class BattleScene implements BattleSceneStub {
 		this.$battle = $('<div class="innerbattle"></div>');
 		this.$frame.append(this.$battle);
 
-		this.$bg = $('<div class="backdrop" style="background-image:url(' + Dex.resourcePrefix + this.backdropImage + ');display:block;opacity:0.8"></div>');
+		if (isShowdownSuiteLocalAssetMode()) {
+			this.$bg = $('<div class="backdrop" style="display:block;opacity:0.96;background:linear-gradient(180deg,#efe3c6 0%,#d9c9a2 52%,#8ca06d 52%,#6b8150 100%)"></div>');
+		} else {
+			this.$bg = $('<div class="backdrop" style="background-image:url(' + Dex.resourcePrefix + this.backdropImage + ');display:block;opacity:0.8"></div>');
+		}
 		this.$terrain = $('<div class="weather"></div>');
 		this.$weather = $('<div class="weather"></div>');
 		this.$bgEffect = $('<div></div>');
@@ -608,7 +616,14 @@ export class BattleScene implements BattleSceneStub {
 
 		this.backdropImage = bg;
 		if (this.$bg) {
-			this.$bg.css('background-image', `url(${Dex.resourcePrefix}${this.backdropImage})`);
+			if (isShowdownSuiteLocalAssetMode()) {
+				this.$bg.css({
+					'background-image': 'none',
+					'background': 'linear-gradient(180deg,#efe3c6 0%,#d9c9a2 52%,#8ca06d 52%,#6b8150 100%)',
+				});
+			} else {
+				this.$bg.css('background-image', `url(${Dex.resourcePrefix}${this.backdropImage})`);
+			}
 		}
 	}
 
@@ -1591,6 +1606,7 @@ export class BattleScene implements BattleSceneStub {
 		this.preloadCache[token].src = url;
 	}
 	preloadEffects() {
+		if (isShowdownSuiteLocalAssetMode()) return;
 		for (let i in BattleEffects) {
 			if (i === 'alpha' || i === 'omega') continue;
 			const url = BattleEffects[i].url;
@@ -1603,6 +1619,7 @@ export class BattleScene implements BattleSceneStub {
 		this.setBgm(1 + this.numericId % 15);
 	}
 	setBgm(bgmNum: number) {
+		if (isShowdownSuiteLocalAssetMode()) return;
 		if (this.bgmNum === bgmNum) return;
 		this.bgmNum = bgmNum;
 
@@ -1670,6 +1687,7 @@ export class BattleScene implements BattleSceneStub {
 		this.updateBgm();
 	}
 	updateBgm() {
+		if (isShowdownSuiteLocalAssetMode()) return;
 		/**
 		 * - not playing in non-battle RoomGames before `|start` (turn -1)
 		 * - not playing at team preview in replays (paused)
@@ -1684,7 +1702,7 @@ export class BattleScene implements BattleSceneStub {
 		);
 		if (nowPlaying) {
 			if (!this.bgm) this.rollBgm();
-			this.bgm!.resume();
+			if (this.bgm) this.bgm.resume();
 		} else if (this.bgm) {
 			this.bgm.pause();
 		}

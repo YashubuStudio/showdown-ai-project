@@ -9,6 +9,25 @@ read_pid_file() {
 	cat "$pid_file"
 }
 
+lan_find_pid_by_marker() {
+	local role="$1"
+	local root_dir="$2"
+
+	local environ_file
+	for environ_file in /proc/[0-9]*/environ; do
+		[[ -r "$environ_file" ]] || continue
+		local pid="${environ_file#/proc/}"
+		pid="${pid%/environ}"
+		local environ
+		environ="$(tr '\0' '\n' < "$environ_file" 2>/dev/null || true)"
+		grep -Fxq "SHOWDOWN_SUITE_LAN_ROLE=$role" <<<"$environ" || continue
+		grep -Fxq "SHOWDOWN_SUITE_ROOT=$root_dir" <<<"$environ" || continue
+		echo "$pid"
+		return 0
+	done
+	return 1
+}
+
 lan_marker_matches() {
 	local pid="$1"
 	local role="$2"

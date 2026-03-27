@@ -2,10 +2,11 @@
  * A panel displaying lists of commands and some basic informational resources
  * @author mia-pi-git
  */
-import { PS, PSRoom, type RoomOptions } from "./client-main";
+import { PS, PSRoom, isShowdownSuiteLocalMode, showdownSuiteLocalText, type RoomOptions } from "./client-main";
 import { PSPanelWrapper, PSRoomPanel } from "./panels";
 import { toID } from "./battle-dex";
 declare const BattleChatCommands: Record<string, string[]>;
+const localText = (english: string, japanese: string) => showdownSuiteLocalText(english, japanese);
 
 class ResourceRoom extends PSRoom {
 	override readonly classType: string = 'resources';
@@ -13,7 +14,7 @@ class ResourceRoom extends PSRoom {
 
 	constructor(options: RoomOptions) {
 		super(options);
-		this.title = 'Resources';
+		this.title = localText('Resources', '情報');
 	}
 	override connect() {}
 }
@@ -29,6 +30,34 @@ class ResourcePanel extends PSRoomPanel<ResourceRoom> {
 	override receiveLine() {}
 	override render() {
 		const { room } = this.props;
+		if (isShowdownSuiteLocalMode()) {
+			return <PSPanelWrapper room={room} scrollable>
+				<div className="pad">
+					<h2>ローカル情報</h2>
+					<hr />
+					<p>このクライアントはローカル LAN 専用です。公開 Pokémon Showdown や Smogon には接続しません。</p>
+					<ul>
+						<li>対戦開始: メインメニューで形式を選び、「対戦開始」を押します。</li>
+						<li>部屋一覧: 「チャットルーム」にはローカルサーバー上の部屋だけが表示されます。</li>
+						<li>名前変更: 右上の「名前を決める」から行います。</li>
+						<li>AI 学習: 別 PC から `showtrain` コマンドでこのサーバーへ接続します。</li>
+					</ul>
+					<hr />
+					<strong>コマンド一覧:</strong>
+					<p><code>/help [command]</code> で各コマンドの説明を確認できます。</p>
+					<label for="search">コマンド検索:</label>{' '}
+					<input
+						name="search"
+						placeholder="検索"
+						style={{ width: '25%' }}
+						value={this.state.search}
+						onChange={e => this.setState({ search: toID((e.target as any)?.value) })}
+					/>
+					<br />
+					<span>{this.getCommandList()}</span>
+				</div>
+			</PSPanelWrapper>;
+		}
 		return <PSPanelWrapper room={room} scrollable>
 			<div className="pad">
 				<h2>PS! Informational Resources</h2>
@@ -127,7 +156,7 @@ class ResourcePanel extends PSRoomPanel<ResourceRoom> {
 	getCommandList() {
 		if (typeof BattleChatCommands !== 'object') {
 			document.addEventListener('ready', () => this.setState({ commandsLoaded: true }));
-			return <>Loading command data, please try again in a few moments...</>;
+			return <>{localText('Loading command data, please try again in a few moments...', 'コマンド一覧を読み込み中です。少し待ってからもう一度開いてください...')}</>;
 		}
 		const buf = [];
 		const search = this.state.search;

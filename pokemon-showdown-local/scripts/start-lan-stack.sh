@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 : "${PS_PORT:=8000}"
 : "${PS_CLIENT_PORT:=8080}"
+: "${PS_SERVER_ID:=koharulocal}"
+: "${PS_LAN_PROFILE:=lightweight}"
 
 "$ROOT_DIR/scripts/start-lan-server.sh"
 "$ROOT_DIR/scripts/start-lan-client.sh"
@@ -29,6 +31,7 @@ fi
 echo
 echo "Landing page:"
 echo "  http://${LAN_IP}:${PS_PORT}"
+echo "  profile: ${PS_LAN_PROFILE}"
 echo
 echo "Direct client:"
-echo "  http://${LAN_IP}:${PS_CLIENT_PORT}/play.pokemonshowdown.com/testclient.html?~~${LAN_IP}:${PS_PORT}"
+echo "  http://${LAN_IP}:${PS_CLIENT_PORT}/play.pokemonshowdown.com/lan.html?~~${LAN_IP}:${PS_PORT}&serverid=${PS_SERVER_ID}"

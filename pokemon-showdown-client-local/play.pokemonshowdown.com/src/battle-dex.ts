@@ -69,7 +69,48 @@ if (typeof window === 'undefined') {
 	window.exports = window;
 }
 
+declare global {
+	interface Window {
+		BattleJapaneseNames?: {
+			species?: Record<string, string>,
+			moves?: Record<string, string>,
+			items?: Record<string, string>,
+			abilities?: Record<string, string>,
+			types?: Record<string, string>,
+			categories?: Record<string, string>,
+		},
+	}
+}
+
 window.nodewebkit = !!(typeof process !== 'undefined' && process.versions?.['node-webkit']);
+
+function isShowdownSuiteLocalAssetMode() {
+	return !!window.SHOWDOWN_SUITE_LOCAL_CONFIG?.enabled;
+}
+
+function escapeHTML(text: any) {
+	return `${text ?? ''}`
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+}
+
+function localSpriteGradient(isFront: boolean) {
+	return isFront ?
+		'linear-gradient(160deg, rgba(57,90,148,0.96), rgba(23,35,70,0.92))' :
+		'linear-gradient(160deg, rgba(106,78,40,0.96), rgba(55,37,18,0.92))';
+}
+
+function localSpriteHTML(label: string, isFront: boolean) {
+	return (
+		`<div class="showdown-suite-local-sprite" style="position:absolute;display:flex;align-items:center;justify-content:center;` +
+		`box-sizing:border-box;border-radius:14px;border:1px solid rgba(255,255,255,0.26);` +
+		`background:${localSpriteGradient(isFront)};color:#fff;padding:6px;text-align:center;overflow:hidden;` +
+		`font:600 12px/1.15 Verdana,sans-serif;text-shadow:0 1px 1px rgba(0,0,0,0.45)">` +
+		`${escapeHTML(label)}</div>`
+	);
+}
 
 export function toID(text: any) {
 	if (text?.id) {
@@ -287,6 +328,14 @@ export const Dex = new class implements ModdedDex {
 	}
 
 	resolveAvatar(avatar: string): string {
+		if (isShowdownSuiteLocalAssetMode()) {
+			const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
+				`<rect width="80" height="80" rx="14" fill="#23324f"/>` +
+				`<circle cx="40" cy="28" r="15" fill="#f0d6a8"/>` +
+				`<path d="M20 72c4-15 16-23 20-23s16 8 20 23" fill="#5576b8"/>` +
+				`</svg>`;
+			return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+		}
 		if (window.BattleAvatarNumbers && avatar in BattleAvatarNumbers) {
 			avatar = BattleAvatarNumbers[avatar];
 		}
@@ -323,6 +372,68 @@ export const Dex = new class implements ModdedDex {
 	prefs(prop: string) {
 		// @ts-expect-error this is what I get for calling it Storage...
 		return window.Storage?.prefs ? window.Storage.prefs(prop) : window.PS?.prefs?.[prop];
+	}
+
+	shouldUseLocalizedNames() {
+		return this.prefs('language') === 'japanese' && !!window.BattleJapaneseNames;
+	}
+
+	getJapaneseEntries(kind: 'species' | 'moves' | 'items' | 'abilities' | 'types' | 'categories') {
+		return window.BattleJapaneseNames?.[kind] || null;
+	}
+
+	getLocalizedEntries(kind: 'species' | 'moves' | 'items' | 'abilities' | 'types' | 'categories') {
+		if (!this.shouldUseLocalizedNames()) return null;
+		return this.getJapaneseEntries(kind);
+	}
+
+	getMoveDisplayName(nameOrMove: string | Move | null | undefined) {
+		if (!nameOrMove) return '';
+		const move = typeof nameOrMove === 'string' ? this.moves.get(nameOrMove) : nameOrMove;
+		return this.getLocalizedEntries('moves')?.[move.id] || move.name;
+	}
+
+	getItemDisplayName(nameOrItem: string | Item | null | undefined) {
+		if (!nameOrItem) return '';
+		const item = typeof nameOrItem === 'string' ? this.items.get(nameOrItem) : nameOrItem;
+		return this.getLocalizedEntries('items')?.[item.id] || item.name;
+	}
+
+	getAbilityDisplayName(nameOrAbility: string | Ability | null | undefined) {
+		if (!nameOrAbility) return '';
+		const ability = typeof nameOrAbility === 'string' ? this.abilities.get(nameOrAbility) : nameOrAbility;
+		return this.getLocalizedEntries('abilities')?.[ability.id] || ability.name;
+	}
+
+	getSpeciesDisplayName(nameOrSpecies: string | Species | null | undefined) {
+		if (!nameOrSpecies) return '';
+		const species = typeof nameOrSpecies === 'string' ? this.species.get(nameOrSpecies) : nameOrSpecies;
+		return this.getLocalizedEntries('species')?.[species.id] || species.name;
+	}
+
+	getPokemonDisplayName(pokemon: { name?: string, speciesForme?: string } | null | undefined) {
+		if (!pokemon) return '';
+		const rawName = `${pokemon.name || ''}`;
+		const speciesForme = pokemon.speciesForme || rawName;
+		if (!speciesForme) return rawName;
+		const species = this.species.get(speciesForme);
+		const speciesName = this.getSpeciesDisplayName(species);
+		if (!rawName) return speciesName;
+		const rawId = toID(rawName);
+		if (rawId === species.id || rawId === toID(species.name) || rawId === toID(species.baseSpecies)) {
+			return speciesName;
+		}
+		return rawName;
+	}
+
+	getTypeDisplayName(type: string | null) {
+		const resolved = this.types.get(type).name || '???';
+		return this.getLocalizedEntries('types')?.[toID(resolved)] || resolved;
+	}
+
+	getCategoryDisplayName(category: string | null) {
+		const resolved = category || 'Status';
+		return this.getLocalizedEntries('categories')?.[toID(resolved)] || resolved;
 	}
 
 	getShortName(name: string) {
@@ -595,6 +706,21 @@ export const Dex = new class implements ModdedDex {
 			pokemon = pokemon.getSpeciesForme() + (isGigantamax ? '-Gmax' : '');
 		}
 		const species = Dex.species.get(pokemon);
+		if (isShowdownSuiteLocalAssetMode()) {
+			const label = species.exists ? Dex.getSpeciesDisplayName(species) : `${pokemon || 'Pokemon'}`;
+			return {
+				gen: mechanicsGen,
+				w: 96,
+				h: 96,
+				y: 0,
+				url: '',
+				pixelated: false,
+				isFrontSprite: isFront,
+				cryurl: '',
+				shiny: options.shiny,
+				rawHTML: localSpriteHTML(label, isFront),
+			};
+		}
 		// Gmax sprites are already extremely large, so we don't need to double.
 		if (species.name.endsWith('-Gmax')) isDynamax = false;
 		let spriteData = {
@@ -803,6 +929,18 @@ export const Dex = new class implements ModdedDex {
 	}
 
 	getPokemonIcon(pokemon: string | Pokemon | ServerPokemon | Dex.PokemonSet | null, facingLeft?: boolean) {
+		if (isShowdownSuiteLocalAssetMode()) {
+			if (pokemon === 'pokeball-fainted') {
+				return 'background:linear-gradient(180deg,#777,#444);border-radius:12px;opacity:.45;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)';
+			} else if (pokemon === 'pokeball-statused') {
+				return 'background:linear-gradient(180deg,#f4cf58,#8f4a1f);border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)';
+			} else if (pokemon === 'pokeball-none') {
+				return 'background:linear-gradient(180deg,#4b5566,#2d3340);border-radius:12px;opacity:.6;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)';
+			} else if (pokemon === 'pokeball') {
+				return 'background:linear-gradient(180deg,#e56363,#7e1b1b);border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)';
+			}
+			return 'background:linear-gradient(160deg,#6884c2,#2b3b62);border-radius:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)';
+		}
 		if (pokemon === 'pokeball') {
 			return `background:transparent url(${Dex.resourcePrefix}sprites/pokemonicons-pokeball-sheet.png) no-repeat scroll -0px 4px`;
 		} else if (pokemon === 'pokeball-statused') {
@@ -917,6 +1055,9 @@ export const Dex = new class implements ModdedDex {
 	}
 
 	getItemIcon(item: any) {
+		if (isShowdownSuiteLocalAssetMode()) {
+			return 'background:linear-gradient(160deg,#c2cad9,#526179);border-radius:5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)';
+		}
 		let num = 0;
 		if (typeof item === 'string' && window.BattleItems) item = window.BattleItems[toID(item)];
 		if (item?.spritenum) num = item.spritenum;
@@ -929,6 +1070,9 @@ export const Dex = new class implements ModdedDex {
 	getTypeIcon(type: string | null, b?: boolean) { // b is just for utilichart.js
 		type = this.types.get(type).name;
 		if (!type) type = '???';
+		if (isShowdownSuiteLocalAssetMode()) {
+			return `<span class="pixelated${b ? ' b' : ''}" style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:14px;padding:0 4px;border-radius:4px;background:#31466f;color:#fff;font:600 9px/1 Verdana,sans-serif">${escapeHTML(this.getTypeDisplayName(type))}</span>`;
+		}
 		let sanitizedType = type.replace(/\?/g, '%3f');
 		return `<img src="${Dex.resourcePrefix}sprites/types/${sanitizedType}.png" alt="${type}" height="14" width="32" class="pixelated${b ? ' b' : ''}" />`;
 	}
@@ -945,6 +1089,9 @@ export const Dex = new class implements ModdedDex {
 		default:
 			sanitizedCategory = 'undefined';
 			break;
+		}
+		if (isShowdownSuiteLocalAssetMode()) {
+			return `<span class="pixelated" style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:14px;padding:0 4px;border-radius:4px;background:#5e3b62;color:#fff;font:600 9px/1 Verdana,sans-serif">${escapeHTML(this.getCategoryDisplayName(sanitizedCategory))}</span>`;
 		}
 		return `<img src="${Dex.resourcePrefix}sprites/categories/${sanitizedCategory}.png" alt="${sanitizedCategory}" height="14" width="32" class="pixelated" />`;
 	}

@@ -5,7 +5,7 @@
  * @license AGPLv3
  */
 
-import { PS, PSRoom, type RoomID, type RoomOptions } from "./client-main";
+import { PS, PSRoom, showdownSuiteLocalText, type RoomID, type RoomOptions } from "./client-main";
 import { PSPanelWrapper, PSRoomPanel } from "./panels";
 import type { RoomInfo } from "./panel-mainmenu";
 import { toID } from "./battle-dex";
@@ -19,13 +19,16 @@ export class RoomsRoom extends PSRoom {
 }
 
 type RoomsSection = [string, RoomInfo[]];
+function localText(english: string, japanese: string) {
+	return showdownSuiteLocalText(english, japanese);
+}
 class RoomsPanel extends PSRoomPanel {
 	static readonly id = 'rooms';
 	static readonly routes = ['rooms'];
 	static readonly Model = RoomsRoom;
 	static readonly location = 'right';
 	static readonly icon = <i class="fa fa-plus rooms-plus" aria-hidden></i>;
-	static readonly title = "Chat Rooms";
+	static readonly title = localText("Chat Rooms", "チャットルーム");
 	hidden = false;
 	search = '';
 	section = '';
@@ -122,10 +125,10 @@ class RoomsPanel extends PSRoomPanel {
 				}
 			}
 			return [
-				["Official chat rooms", officialRooms],
+				[localText("Official chat rooms", "公式チャット"), officialRooms],
 				[spotLightLabel, spotLightRooms],
-				["Chat rooms", chatRooms],
-				["Hidden rooms", hiddenRooms],
+				[localText("Chat rooms", "チャットルーム"), chatRooms],
+				[localText("Hidden rooms", "非表示ルーム"), hiddenRooms],
 			];
 		}
 
@@ -157,7 +160,7 @@ class RoomsPanel extends PSRoomPanel {
 		));
 
 		const hidden: RoomsSection[] = !exactMatch ?
-			[["Possible secret room", [{ title: this.search, desc: "(Private room?)" }]]] : [];
+			[[localText("Possible secret room", "候補の秘密ルーム"), [{ title: this.search, desc: localText("(Private room?)", "（非公開ルームの可能性）") }]]] : [];
 
 		const autoFill = this.lastKeyCode !== 127 && this.lastKeyCode >= 32;
 		if (autoFill && !forceNoAutocomplete) {
@@ -182,10 +185,10 @@ class RoomsPanel extends PSRoomPanel {
 				this.search += '-';
 			}
 
-			return [["Search results", results], ...hidden];
+			return [[localText("Search results", "検索結果"), results], ...hidden];
 		}
 
-		return [...hidden, ["Search results", results]];
+		return [...hidden, [localText("Search results", "検索結果"), results]];
 	}
 	override render() {
 		if (this.hidden && PS.isVisible(this.props.room)) this.hidden = false;
@@ -197,27 +200,27 @@ class RoomsPanel extends PSRoomPanel {
 
 		return <PSPanelWrapper room={this.props.room} scrollable><div class="pad">
 			<button class="button" style="float:right;font-size:10pt;margin-top:3px" onClick={this.hide}>
-				<i class="fa fa-caret-right" aria-hidden></i> Hide
+				<i class="fa fa-caret-right" aria-hidden></i> {localText('Hide', '隠す')}
 			</button>
 			<div class="roomcounters">
-				<a class="button" href="users" title="Find an online user">
+				<a class="button" href="users" title={localText("Find an online user", "接続中のユーザーを探す")}>
 					<span
 						class="pixelated usercount"
 						title="Meloetta is PS's mascot! The Aria forme is about using its voice, and represents our chatrooms."
 					></span>
-					<strong>{rooms.userCount || '-'}</strong> users online
+					<strong>{rooms.userCount || '-'}</strong> {localText('users online', '人が接続中')}
 				</a> {}
-				<a class="button" href="battles" title="Watch an active battle">
+				<a class="button" href="battles" title={localText("Watch an active battle", "進行中の対戦を観戦")}>
 					<span
 						class="pixelated battlecount"
 						title="Meloetta is PS's mascot! The Pirouette forme is Fighting-type, and represents our battles."
 					></span>
-					<strong>{rooms.battleCount || '-'}</strong> active battles
+					<strong>{rooms.battleCount || '-'}</strong> {localText('active battles', '進行中の対戦')}
 				</a>
 			</div>
 			<div>
 				<select name="sections" class="button" onChange={this.changeSection}>
-					<option value="">(All rooms)</option>
+					<option value="">{localText('(All rooms)', '（すべての部屋）')}</option>
 					{rooms.sectionTitles?.map(title => {
 						return <option value={title}> {title} </option>;
 					})}
@@ -225,7 +228,7 @@ class RoomsPanel extends PSRoomPanel {
 				<br /><br />
 				<input
 					type="search" name="roomsearch" class="textbox autofocus" style="width: 100%; max-width: 480px"
-					placeholder="Join or search for rooms" autocomplete="off"
+					placeholder={localText("Join or search for rooms", "部屋に参加 / 検索")} autocomplete="off"
 					onInput={this.changeSearch} onKeyDown={this.keyDownSearch} onBlur={this.handleOnBlur}
 				/>
 			</div>
@@ -238,14 +241,14 @@ class RoomsPanel extends PSRoomPanel {
 	renderRoomList() {
 		const roomsCache = PS.mainmenu.roomsCache;
 		if (roomsCache.userCount === undefined) {
-			return <div class="roomlist"><h2>Official chat rooms</h2><p><em>Connecting...</em></p></div>;
+			return <div class="roomlist"><h2>{localText('Official chat rooms', '公式チャット')}</h2><p><em>{localText('Connecting...', '接続中...')}</em></p></div>;
 		}
 		if (this.search) {
 			// do nothing
 		} else if (PS.isOffline) {
-			return <div class="roomlist"><h2>Offline</h2></div>;
+			return <div class="roomlist"><h2>{localText('Offline', 'オフライン')}</h2></div>;
 		} else if (roomsCache.userCount === undefined) {
-			return <div class="roomlist"><h2>Official chat rooms</h2><p><em>Connecting...</em></p></div>;
+			return <div class="roomlist"><h2>{localText('Official chat rooms', '公式チャット')}</h2><p><em>{localText('Connecting...', '接続中...')}</em></p></div>;
 		}
 
 		// Descending order
@@ -265,12 +268,12 @@ class RoomsPanel extends PSRoomPanel {
 				<h2>{title}</h2>
 				{sortedRooms.map((roomInfo, i) => <div key={roomInfo.title}>
 					<a href={`/${toID(roomInfo.title)}`} class={`blocklink${i === index ? " cur" : ''}`}>
-						{roomInfo.userCount !== undefined && <small style="float:right">({roomInfo.userCount} users)</small>}
+						{roomInfo.userCount !== undefined && <small style="float:right">({roomInfo.userCount} {localText('users', '人')})</small>}
 						<strong><i class="fa fa-comment-o" aria-hidden></i> {roomInfo.title}<br /></strong>
 						<small>{roomInfo.desc || ''}</small>
 					</a>
 					{roomInfo.subRooms && <div class="subrooms">
-						<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> Subrooms: {}
+						<i class="fa fa-level-up fa-rotate-90" aria-hidden></i> {localText('Subrooms:', 'サブルーム:')} {}
 						{roomInfo.subRooms.map(roomName => [<a href={`/${toID(roomName)}`} class="blocklink">
 							<i class="fa fa-comment-o" aria-hidden></i> <strong>{roomName}</strong>
 						</a>, ' '])}

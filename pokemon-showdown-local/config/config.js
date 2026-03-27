@@ -4,6 +4,8 @@ const port = Number(process.env.PS_PORT || 8000);
 const bindaddress = process.env.PS_BIND_ADDRESS || '0.0.0.0';
 const clientPort = Number(process.env.PS_CLIENT_PORT || 8080);
 const serverid = process.env.PS_SERVER_ID || 'koharulocal';
+const lanProfile = process.env.PS_LAN_PROFILE || 'lightweight';
+const isLightweightProfile = lanProfile !== 'training';
 
 function escapeHtml(str) {
 	return String(str)
@@ -27,28 +29,47 @@ exports.noguestsecurity = true;
 exports.nobattlesearch = true;
 exports.repl = false;
 exports.crashguard = false;
+exports.loglevel = 5;
+exports.nothrottle = isLightweightProfile;
+exports.noipchecks = isLightweightProfile;
+exports.subprocesses = isLightweightProfile ? 0 : {
+	network: 1,
+	simulator: 1,
+	validator: 1,
+	verifier: 0,
+	localartemis: 0,
+	remoteartemis: 0,
+	friends: 0,
+	chatdb: 0,
+	modlog: 0,
+	pm: 0,
+	battlesearch: 0,
+	datasearch: 0,
+};
 
 exports.reportjoins = false;
 exports.reportjoinsperiod = 0;
 exports.reportbattles = false;
 exports.reportbattlejoins = false;
 
-// Enable the local SQLite-backed features useful for private play and bot work.
-exports.usesqlite = true;
-exports.usesqlitemodlog = true;
-exports.usesqlitefriends = true;
-exports.usesqlitepms = true;
+// Lightweight LAN mode: disable optional SQLite-backed features and keep the
+// server focused on live battles instead of persistence or moderation tooling.
+exports.usesqlite = false;
+exports.usesqlitemodlog = false;
+exports.usesqlitefriends = false;
+exports.usesqlitepms = false;
 
 exports.customhttpresponse = function (req, res) {
 	if (!req.url || req.url === '/' || req.url === '/index.html') {
 		const host = escapeHtml(getHostname(req));
 		const safeServerid = escapeHtml(serverid);
+		const encodedServerid = encodeURIComponent(serverid);
 		const clientUrl =
-			`http://${host}:${clientPort}/play.pokemonshowdown.com/testclient.html?~~${host}:${port}`;
+			`http://${host}:${clientPort}/play.pokemonshowdown.com/lan.html?~~${host}:${port}&serverid=${encodedServerid}`;
 
 		res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
 		res.end(`<!doctype html>
-<html lang="en">
+<html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -81,9 +102,10 @@ a {
 <main>
 <div class="card">
 <h1>Pokemon Showdown LAN</h1>
-<p>Open the local client from this device or another device on the same network.</p>
+<p>この PC または同じローカルネットワーク上の別 PC からローカルクライアントを開いてください。</p>
 <p><a href="${clientUrl}">${clientUrl}</a></p>
 <p>Server ID: <code>${safeServerid}</code></p>
+<p>この構成では公開 Pokémon Showdown ではなく、この LAN サーバーだけに接続します。</p>
 </div>
 </main>
 </body>

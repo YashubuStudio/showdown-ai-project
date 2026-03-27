@@ -7,7 +7,17 @@
 
 import preact from "../js/lib/preact";
 import { PSLoginServer } from "./client-connection";
-import { Config, PS, PSRoom, type RoomID, type RoomOptions, type Team } from "./client-main";
+import {
+	Config,
+	loadRememberedShowdownSuiteLocalUsername,
+	isShowdownSuiteLocalMode,
+	PS,
+	PSRoom,
+	showdownSuiteLocalText,
+	type RoomID,
+	type RoomOptions,
+	type Team,
+} from "./client-main";
 import { PSIcon, PSPanelWrapper, PSRoomPanel } from "./panels";
 import type { BattlesRoom } from "./panel-battle";
 import type { ChatRoom } from "./panel-chat";
@@ -22,6 +32,10 @@ export type RoomInfo = {
 	title: string, desc?: string, userCount?: number, section?: string, privacy?: 'hidden',
 	spotlight?: string, subRooms?: string[],
 };
+
+function localText(english: string, japanese: string) {
+	return showdownSuiteLocalText(english, japanese);
+}
 
 export class MainMenuRoom extends PSRoom {
 	override readonly classType: string = 'mainmenu';
@@ -49,6 +63,13 @@ export class MainMenuRoom extends PSRoom {
 	search: { searching: string[], games: Record<RoomID, string> | null } = { searching: [], games: null };
 	disallowSpectators: boolean | null = PS.prefs.disallowspectators;
 	lastChallenged: number | null = null;
+	private syncedPreferredLanguage: string | null = null;
+	syncPreferredLanguage() {
+		const language = PS.prefs.language || 'english';
+		if (!language || this.syncedPreferredLanguage === language) return;
+		this.syncedPreferredLanguage = language;
+		PS.send(`/noreply /language ${language}`);
+	}
 	constructor(options: RoomOptions) {
 		super(options);
 		if (this.backlog) {
@@ -125,6 +146,14 @@ export class MainMenuRoom extends PSRoom {
 		case 'challstr': {
 			const [, challstr] = args;
 			PS.user.challstr = challstr;
+			if (isShowdownSuiteLocalMode() || !PS.server.registered) {
+				PS.user.initializing = false;
+				const rememberedName = loadRememberedShowdownSuiteLocalUsername();
+				if (rememberedName && !PS.user.named) {
+					PS.send(`/trn ${rememberedName}`);
+				}
+				return;
+			}
 			PSLoginServer.query(
 				'upkeep', { challstr }
 			).then(res => {
@@ -141,10 +170,21 @@ export class MainMenuRoom extends PSRoom {
 			});
 			return;
 		} case 'updateuser': {
-			const [, fullName, namedCode, avatar] = args;
+			const [, fullName, namedCode, avatar, settingsJSON] = args;
 			const named = namedCode === '1';
-			if (named) PS.user.initializing = false;
+			if (settingsJSON) {
+				try {
+					const settings = JSON.parse(settingsJSON);
+					if (typeof settings?.language === 'string') {
+						this.syncedPreferredLanguage = settings.language;
+					}
+				} catch {}
+			}
+			if (named) {
+				PS.user.initializing = false;
+			}
 			PS.user.setName(fullName, named, avatar);
+			if (named) this.syncPreferredLanguage();
 			PS.teams.loadRemoteTeams();
 			return;
 		} case 'updatechallenges': {
@@ -495,6 +535,14 @@ class NewsPanel extends PSRoomPanel {
 	};
 	override render() {
 		const cookieSet = document.cookie.includes('preactalpha=1');
+		if (isShowdownSuiteLocalMode()) {
+			return <PSPanelWrapper room={this.props.room} fullSize scrollable>
+				<div class="construction">
+					このクライアントはローカル LAN 専用です。公開 Pokémon Showdown には接続しません。
+				</div>
+				<div class="readable-bg" dangerouslySetInnerHTML={{ __html: PS.newsHTML }}></div>
+			</PSPanelWrapper>;
+		}
 		return <PSPanelWrapper room={this.props.room} fullSize scrollable>
 			<div class="construction">
 				This is the client rewrite beta test.
@@ -612,13 +660,14 @@ class MainMenuPanel extends PSRoomPanel<MainMenuRoom> {
 
 		// This does not use the word "game" because it includes things like help tickets
 		return <div class="menugroup">
-			<p class="label">You are in:</p>
+			<p class="label">{localText('You are in:', '参加中:')}</p>
 			{Object.entries(PS.mainmenu.search.games).map(([roomid, gameName]) => <div>
 				<a class="blocklink" href={`${roomid}`}>{gameName}</a>
 			</div>)}
 		</div>;
 	}
 	renderSearchButton() {
+		const isLocal = isShowdownSuiteLocalMode();
 		if (PS.down) {
 			return <div class="menugroup" style="background: rgba(10,10,10,.6)">
 				{PS.down === 'ddos' ? (
@@ -659,27 +708,32 @@ class MainMenuPanel extends PSRoomPanel<MainMenuRoom> {
 		>
 			<p>
 				<button class="button small" data-href="battleoptions" title="Options" aria-label="Options">
-					Battle options <i class="fa fa-caret-down"></i>
+					{localText('Battle options', '対戦オプション')} <i class="fa fa-caret-down"></i>
 				</button></p>
 			{PS.mainmenu.searchCountdown ? (
 				<>
 					<button class="mainmenu1 mainmenu big button disabled" type="submit"><strong>
-						<i class="fa fa-refresh fa-spin" aria-hidden></i> Searching in {PS.mainmenu.searchCountdown.countdown}...
+						<i class="fa fa-refresh fa-spin" aria-hidden></i> {localText(`Searching in ${PS.mainmenu.searchCountdown.countdown}...`, `${PS.mainmenu.searchCountdown.countdown} 秒後に検索...`)}
 					</strong></button>
-					<p class="buttonbar"><button class="button" data-cmd="/cancelsearch">Cancel</button></p>
+					<p class="buttonbar"><button class="button" data-cmd="/cancelsearch">{localText('Cancel', 'キャンセル')}</button></p>
+					{isLocal && <p><small>{localText('This only matches users connected to this LAN server.', 'この検索はこの LAN サーバーに接続している相手だけを対象にします。')}</small></p>}
 				</>
 			) : PS.mainmenu.searchingFormat() ? (
 				<>
 					<button class="mainmenu1 mainmenu big button disabled" type="submit">
-						<strong><i class="fa fa-refresh fa-spin" aria-hidden></i> Searching...</strong>
+						<strong><i class="fa fa-refresh fa-spin" aria-hidden></i> {localText('Searching...', '検索中...')}</strong>
 					</button>
-					<p class="buttonbar"><button class="button" data-cmd="/cancelsearch">Cancel</button></p>
+					<p class="buttonbar"><button class="button" data-cmd="/cancelsearch">{localText('Cancel', 'キャンセル')}</button></p>
+					{isLocal && <p><small>{localText('Open a second local client or challenge another LAN user to start a battle.', '対戦を始めるには、別の PC / 別タブでもこのローカルクライアントを開くか、LAN 内の別ユーザーに challenge してください。')}</small></p>}
 				</>
 			) : (
-				<button class="mainmenu1 mainmenu big button" type="submit">
-					<strong>Battle!</strong><br />
-					<small>Find a random opponent</small>
-				</button>
+				<>
+					<button class="mainmenu1 mainmenu big button" type="submit">
+						<strong>{localText('Battle!', '対戦開始')}</strong><br />
+						<small>{isLocal ? localText('Find a LAN opponent', 'LAN 内の相手を探す') : localText('Find a random opponent', 'ランダムな相手を探す')}</small>
+					</button>
+					{isLocal && <p><small>{localText('Fully local mode: internet matchmaking is disabled.', '完全ローカルモードのため、インターネット上の相手とはマッチしません。')}</small></p>}
+				</>
 			)}
 		</TeamForm>;
 	}
@@ -697,34 +751,40 @@ class MainMenuPanel extends PSRoomPanel<MainMenuRoom> {
 					{this.renderSearchButton()}
 
 					<div class="menugroup">
-						<p><a class="mainmenu2 mainmenu button" href="teambuilder">Teambuilder</a></p>
-						<p><a class={"mainmenu3 mainmenu" + onlineButton} href="ladder">Ladder</a></p>
-						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="view-tournaments-all">Tournaments</a></p>
+						<p><a class="mainmenu2 mainmenu button" href="teambuilder">{localText('Teambuilder', 'チームビルダー')}</a></p>
+						<p><a class={"mainmenu3 mainmenu" + onlineButton} href="ladder">{localText('Ladder', 'レート')}</a></p>
+						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="view-tournaments-all">{localText('Tournaments', '大会')}</a></p>
 					</div>
 
 					<div class="menugroup">
-						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="battles">Watch a battle</a></p>
-						<p><a class={"mainmenu5 mainmenu" + onlineButton} href="users">Find a user</a></p>
-						<p><a class={"mainmenu6 mainmenu" + onlineButton} href="view-friends-all">Friends</a></p>
-						<p><a class={"mainmenu7 mainmenu" + onlineButton} href="resources">Info & Resources</a></p>
+						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="battles">{localText('Watch a battle', '対戦観戦')}</a></p>
+						<p><a class={"mainmenu5 mainmenu" + onlineButton} href="users">{localText('Find a user', 'ユーザー検索')}</a></p>
+						<p><a class={"mainmenu6 mainmenu" + onlineButton} href="view-friends-all">{localText('Friends', 'フレンド')}</a></p>
+						<p><a class={"mainmenu7 mainmenu" + onlineButton} href="resources">{localText('Info & Resources', '情報')}</a></p>
 					</div>
 				</div>
 				<div class="mainmenu-right" style={{ display: PS.leftPanelWidth ? 'none' : 'block' }}>
 					<div class="menugroup">
-						<p><a class={"mainmenu1 mainmenu" + onlineButton} href="rooms">Chat rooms</a></p>
+						<p><a class={"mainmenu1 mainmenu" + onlineButton} href="rooms">{localText('Chat rooms', 'チャットルーム')}</a></p>
 						{PS.server.id !== 'showdown' && (
-							<p><a class={"mainmenu2 mainmenu" + onlineButton} href="lobby">Lobby chat</a></p>
+							<p><a class={"mainmenu2 mainmenu" + onlineButton} href="lobby">{localText('Lobby chat', 'ロビーチャット')}</a></p>
 						)}
 					</div>
 				</div>
 				<div class="mainmenu-footer">
 					<div class="bgcredit"></div>
 					<small>
-						<a href={`//${Config.routes.dex}/`} target="_blank">Pok&eacute;dex</a> | {}
-						<a href={`//${Config.routes.replays}/`} target="_blank">Replays</a> | {}
-						<a href={`//${Config.routes.root}/rules`} target="_blank">Rules</a> | {}
-						<a href={`//${Config.routes.root}/credits`} target="_blank">Credits</a> | {}
-						<a href="//smogon.com/forums/" target="_blank">Forum</a>
+						{isShowdownSuiteLocalMode() ? (
+							<>ローカル専用モード: 外部サイトへのリンクは無効です。</>
+						) : (
+							<>
+								<a href={`//${Config.routes.dex}/`} target="_blank">Pok&eacute;dex</a> | {}
+								<a href={`//${Config.routes.replays}/`} target="_blank">Replays</a> | {}
+								<a href={`//${Config.routes.root}/rules`} target="_blank">Rules</a> | {}
+								<a href={`//${Config.routes.root}/credits`} target="_blank">Credits</a> | {}
+								<a href="//smogon.com/forums/" target="_blank">Forum</a>
+							</>
+						)}
 					</small>
 				</div>
 			</div>

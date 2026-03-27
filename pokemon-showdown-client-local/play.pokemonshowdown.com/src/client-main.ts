@@ -55,6 +55,68 @@ export interface PSConfig {
 }
 export declare const Config: PSConfig;
 
+declare global {
+	interface Window {
+	SHOWDOWN_SUITE_LOCAL_CONFIG?: {
+		enabled?: boolean,
+		usernameKey?: string,
+		debugNetLog?: boolean,
+	};
+	}
+}
+
+const SHOWDOWN_SUITE_LOCAL_USERNAME_KEY = 'showdown_suite_local_username';
+const SHOWDOWN_SUITE_LOCAL_PREFS_VERSION_KEY = 'showdown_suite_local_prefs_version';
+const SHOWDOWN_SUITE_LOCAL_PREFS_VERSION = 3;
+
+export function getShowdownSuiteLocalConfig() {
+	return window.SHOWDOWN_SUITE_LOCAL_CONFIG || null;
+}
+
+function shouldDebugNetLog() {
+	return getShowdownSuiteLocalConfig()?.debugNetLog === true;
+}
+
+export function isShowdownSuiteLocalMode() {
+	return !!getShowdownSuiteLocalConfig()?.enabled;
+}
+
+export function getShowdownSuiteLocalUsernameKey() {
+	return getShowdownSuiteLocalConfig()?.usernameKey || SHOWDOWN_SUITE_LOCAL_USERNAME_KEY;
+}
+
+function getShowdownSuiteLocalDisplayLanguage() {
+	try {
+		const runtimeLanguage = window.PS?.prefs?.language;
+		if (runtimeLanguage) return runtimeLanguage;
+		const storedPrefs = localStorage.getItem('showdown_prefs');
+		if (!storedPrefs) return 'english';
+		return JSON.parse(storedPrefs)?.language || 'english';
+	} catch {
+		return 'english';
+	}
+}
+
+export function showdownSuiteLocalText(english: string, japanese: string) {
+	return isShowdownSuiteLocalMode() && getShowdownSuiteLocalDisplayLanguage() === 'japanese' ? japanese : english;
+}
+
+export function loadRememberedShowdownSuiteLocalUsername() {
+	if (!isShowdownSuiteLocalMode()) return '';
+	try {
+		return localStorage.getItem(getShowdownSuiteLocalUsernameKey()) || '';
+	} catch {
+		return '';
+	}
+}
+
+export function saveRememberedShowdownSuiteLocalUsername(name: string) {
+	if (!isShowdownSuiteLocalMode()) return;
+	try {
+		localStorage.setItem(getShowdownSuiteLocalUsernameKey(), name);
+	} catch {}
+}
+
 /**********************************************************************
  * Prefs
  *********************************************************************/
@@ -167,7 +229,7 @@ class PSPrefs extends PSStreamModel<string | null> {
 
 	storageEngine: 'localStorage' | 'iframeLocalStorage' | '' = '';
 	storage: { [k: string]: any } = {};
-	readonly origin = `https://${Config.routes.client}`;
+	readonly origin = `${document.location.protocol !== 'http:' ? 'https:' : ''}//${Config.routes.client}`;
 	constructor() {
 		super();
 
@@ -219,6 +281,19 @@ class PSPrefs extends PSStreamModel<string | null> {
 		}
 	}
 	fixPrefs(newPrefs: any) {
+		if (isShowdownSuiteLocalMode()) {
+			const currentLocalPrefsVersion = Number(newPrefs[SHOWDOWN_SUITE_LOCAL_PREFS_VERSION_KEY] || 0);
+			if (currentLocalPrefsVersion < SHOWDOWN_SUITE_LOCAL_PREFS_VERSION) {
+				if (newPrefs['language'] === undefined || newPrefs['language'] === 'japanese') newPrefs['language'] = 'english';
+				if (newPrefs['noanim'] === undefined) newPrefs['noanim'] = true;
+				if (newPrefs['nogif'] === undefined) newPrefs['nogif'] = true;
+				if (newPrefs['effectvolume'] === undefined) newPrefs['effectvolume'] = 0;
+				if (newPrefs['musicvolume'] === undefined) newPrefs['musicvolume'] = 0;
+				if (newPrefs['showbattles'] === undefined) newPrefs['showbattles'] = false;
+				newPrefs[SHOWDOWN_SUITE_LOCAL_PREFS_VERSION_KEY] = SHOWDOWN_SUITE_LOCAL_PREFS_VERSION;
+			}
+		}
+
 		const oldShowjoins = newPrefs['showjoins'];
 		if (oldShowjoins !== undefined && typeof oldShowjoins !== 'object') {
 			const showjoins: { [serverid: string]: { [roomid: string]: 1 | 0 } } = {};
@@ -441,7 +516,8 @@ class PSTeams extends PSStreamModel<'team' | 'format'> {
 		this.list.splice(index, 0, ...teams);
 	}
 	unpackOldBuffer(buffer: string) {
-		PS.alert(`Your team storage format is too old for PS. You'll need to upgrade it at https://${Config.routes.client}/recoverteams.html`);
+		const protocol = document.location.protocol !== 'http:' ? 'https:' : '';
+		PS.alert(`Your team storage format is too old for PS. You'll need to upgrade it at ${protocol}//${Config.routes.client}/recoverteams.html`);
 		this.list = [];
 	}
 	packAll(teams: Team[]) {
@@ -486,6 +562,7 @@ class PSTeams extends PSStreamModel<'team' | 'format'> {
 		};
 	}
 	loadRemoteTeams() {
+		if (isShowdownSuiteLocalMode() || !PS.server.registered) return;
 		PSLoginServer.query('getteams').then(data => {
 			if (!data) return;
 			if (data.actionerror) {
@@ -559,6 +636,9 @@ class PSTeams extends PSStreamModel<'team' | 'format'> {
 	loadTeam(team: Team | undefined | null): Promise<void>;
 	loadTeam(team: Team | undefined | null, ifNeeded?: boolean): void | Promise<void> {
 		if (!team?.uploaded || team.uploadedPackedTeam) return ifNeeded ? undefined : Promise.resolve();
+		if (isShowdownSuiteLocalMode() || !PS.server.registered) {
+			return ifNeeded ? undefined : Promise.resolve();
+		}
 		if (team.uploaded.notLoaded && team.uploaded.notLoaded !== true) return team.uploaded.notLoaded;
 
 		const notLoaded = team.uploaded.notLoaded;
@@ -626,6 +706,9 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 		this.named = named;
 		this.avatar = avatar;
 		this.away = fullName.endsWith('@!');
+		if (named && this.userid) {
+			saveRememberedShowdownSuiteLocalUsername(name);
+		}
 		this.update(null);
 		if (loggingIn) {
 			for (const roomid in PS.rooms) {
@@ -674,6 +757,11 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			this.update({ success: true });
 			return;
 		}
+		if (isShowdownSuiteLocalMode() || !PS.server.registered) {
+			PS.send(`/trn ${name}`);
+			this.update({ success: true });
+			return;
+		}
 		this.loggingIn = name;
 		this.update(null);
 		PSLoginServer.rawQuery(
@@ -684,6 +772,10 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 		});
 	}
 	changeNameWithPassword(name: string, password: string, special: PSLoginState = { needsPassword: true }) {
+		if (isShowdownSuiteLocalMode() || !PS.server.registered) {
+			this.changeName(name);
+			return;
+		}
 		this.loggingIn = name;
 		if (!password && !special) {
 			this.updateLogin({
@@ -755,9 +847,11 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 		}
 	}
 	logOut() {
-		PSLoginServer.query(
-			'logout', { userid: this.userid }
-		);
+		if (PS.server.registered && !isShowdownSuiteLocalMode()) {
+			PSLoginServer.query(
+				'logout', { userid: this.userid }
+			);
+		}
 		PS.send(`/logout`);
 		PS.connection?.disconnect();
 
@@ -2105,7 +2199,9 @@ export const PS = new class extends PSModel {
 		}
 		const roomid2 = roomid || 'lobby' as RoomID;
 		let room = PS.rooms[roomid];
-		console.log('\u2705 ' + (roomid ? '[' + roomid + '] ' : '') + '%c' + msg, "color: #007700");
+		if (shouldDebugNetLog()) {
+			console.log('\u2705 ' + (roomid ? '[' + roomid + '] ' : '') + '%c' + msg, "color: #007700");
+		}
 		let isInit = false;
 		for (const line of msg.split('\n')) {
 			const args = BattleTextParser.parseLine(line);
@@ -2180,7 +2276,9 @@ export const PS = new class extends PSModel {
 	}
 	send(msg: string, roomid?: RoomID) {
 		const bracketRoomid = roomid ? `[${roomid}] ` : '';
-		console.log(`\u25b6\ufe0f ${bracketRoomid}%c${msg}`, "color: #776677");
+		if (shouldDebugNetLog()) {
+			console.log(`\u25b6\ufe0f ${bracketRoomid}%c${msg}`, "color: #776677");
+		}
 		if (!this.connection) {
 			PS.alert(`You are not connected and cannot send ${msg}.`);
 			return;
@@ -2788,6 +2886,7 @@ export const PS = new class extends PSModel {
 		}
 	}
 	requestNotifications() {
+		if (isShowdownSuiteLocalMode() || !window.isSecureContext) return;
 		try {
 			if (window.webkitNotifications?.requestPermission) {
 				// Notification.requestPermission crashes Chrome 23:

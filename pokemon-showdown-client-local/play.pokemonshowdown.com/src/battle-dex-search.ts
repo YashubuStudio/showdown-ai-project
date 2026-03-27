@@ -22,17 +22,37 @@ export type SearchRow = (
 );
 
 type SearchFilter = [string, string];
+type LocalizedSearchKind = 'species' | 'moves' | 'items' | 'abilities' | 'types' | 'categories';
+type LocalizedSearchEntry = { id: ID, label: string, normalizedLabel: string };
 
 /** ID, SearchType, index (if alias), offset (if offset alias) */
 declare const BattleSearchIndex: [ID, SearchType, number?, number?][];
 declare const BattleSearchIndexOffset: any;
 declare const BattleTeambuilderTable: any;
 
+const localizedKindForSearchType: Partial<Record<SearchType, LocalizedSearchKind>> = {
+	pokemon: 'species',
+	move: 'moves',
+	item: 'items',
+	ability: 'abilities',
+	type: 'types',
+	category: 'categories',
+};
+
+function shouldUseLocalizedSearch(query: string) {
+	return /[^\x00-\x7F]/.test(query);
+}
+
+function normalizeLocalizedSearchText(query: string) {
+	return `${query || ''}`.normalize('NFKC').replace(/[\s\u3000]+/g, '').trim();
+}
+
 /**
  * Backend for search UIs.
  */
 export class DexSearch {
 	query = '';
+	rawQuery = '';
 
 	/**
 	 * Dex for the mod/generation to search.
@@ -44,6 +64,8 @@ export class DexSearch {
 	results: SearchRow[] | null = null;
 	prependResults: SearchRow[] | null = null;
 	exactMatch = false;
+
+	private static localizedSearchCache: Partial<Record<LocalizedSearchKind, LocalizedSearchEntry[]>> = {};
 
 	static typeTable = {
 		pokemon: 1,
@@ -101,20 +123,84 @@ export class DexSearch {
 	}
 
 	find(query: string) {
-		query = toID(query);
-		if (this.query === query && this.results) {
+		const rawQuery = `${query || ''}`.trim();
+		const localizedResults = this.localizedTextSearch(rawQuery);
+		const queryKey = localizedResults === undefined ? toID(rawQuery) : `ja:${normalizeLocalizedSearchText(rawQuery)}`;
+		if (this.query === queryKey && this.rawQuery === rawQuery && this.results) {
 			return false;
 		}
-		this.query = query;
-		if (!query) {
+		this.query = queryKey;
+		this.rawQuery = rawQuery;
+		if (!rawQuery) {
 			this.results = this.typedSearch?.getResults(this.filters, this.sortCol, this.reverseSort) || [];
 			if (!this.filters && !this.sortCol && this.prependResults) {
 				this.results = [...this.prependResults, ...this.results];
 			}
+		} else if (localizedResults !== undefined) {
+			this.results = localizedResults;
 		} else {
-			this.results = this.textSearch(query);
+			this.results = this.textSearch(queryKey);
 		}
 		return true;
+	}
+
+	private getLocalizedSearchEntries(kind: LocalizedSearchKind) {
+		if (!DexSearch.localizedSearchCache[kind]) {
+			const localizedEntries = Dex.getJapaneseEntries(kind);
+			DexSearch.localizedSearchCache[kind] = localizedEntries ? Object.entries(localizedEntries)
+				.filter(([, label]) => !!label)
+				.map(([id, label]) => ({
+					id: id as ID,
+					label,
+					normalizedLabel: normalizeLocalizedSearchText(label),
+				})) : [];
+		}
+		return DexSearch.localizedSearchCache[kind] || [];
+	}
+
+	private localizedTextSearch(rawQuery: string): SearchRow[] | undefined {
+		if (!window.BattleJapaneseNames || !shouldUseLocalizedSearch(rawQuery)) return undefined;
+		const normalizedQuery = normalizeLocalizedSearchText(rawQuery);
+		if (!normalizedQuery) return [];
+
+		const searchType = this.typedSearch?.searchType || '';
+		const requestedTypes = (searchType ?
+			[searchType] :
+			(['pokemon', 'move', 'item', 'ability', 'type', 'category'] as SearchType[]));
+		const results: SearchRow[] = [];
+		const illegal = this.typedSearch?.illegalReasons;
+
+		for (const type of requestedTypes) {
+			const kind = localizedKindForSearchType[type];
+			if (!kind) continue;
+			const matches = this.getLocalizedSearchEntries(kind)
+				.filter(entry => entry.normalizedLabel.includes(normalizedQuery))
+				.sort((a, b) => {
+					const aIndex = a.normalizedLabel.indexOf(normalizedQuery);
+					const bIndex = b.normalizedLabel.indexOf(normalizedQuery);
+					if ((aIndex === 0) !== (bIndex === 0)) return aIndex === 0 ? -1 : 1;
+					if (aIndex !== bIndex) return aIndex - bIndex;
+					if (a.label.length !== b.label.length) return a.label.length - b.label.length;
+					return a.label.localeCompare(b.label, 'ja');
+				});
+			if (!matches.length) continue;
+
+			results.push(['header', DexSearch.typeName[type]]);
+			const legalMatches = illegal && type === searchType ?
+				matches.filter(entry => !(entry.id in illegal)) :
+				matches;
+			const illegalMatches = illegal && type === searchType ?
+				matches.filter(entry => entry.id in illegal) :
+				[];
+			const orderedMatches = [...legalMatches, ...illegalMatches];
+			for (const entry of orderedMatches.slice(0, 100)) {
+				const matchStart = entry.normalizedLabel.indexOf(normalizedQuery);
+				const matchEnd = matchStart + normalizedQuery.length;
+				results.push([type, entry.id, -(matchStart + 1), -(matchEnd + 1)]);
+			}
+		}
+
+		return results;
 	}
 
 	setType(searchType: SearchType | '', format = '' as ID, speciesOrSet: ID | Dex.PokemonSet = '' as ID) {
@@ -1080,6 +1166,10 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			table = table[`gen${dex.gen}stadium${dex.gen > 1 ? dex.gen : ''}`];
 		} else if (this.formatType === 'legendsza') {
 			table = table[`gen9legendsou`];
+		}
+
+		if (!table || (!table.tierSet && !table.tiers)) {
+			return this.getDefaultResults();
 		}
 
 		if (!table.tierSet) {

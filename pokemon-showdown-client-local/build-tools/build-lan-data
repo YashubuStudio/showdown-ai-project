@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const {execFileSync} = require('child_process');
+const {resolveShowdownRoot, showdownDistPath} = require('./showdown-source');
+
+const rootDir = path.resolve(__dirname, '..');
+const dataDir = path.join(rootDir, 'play.pokemonshowdown.com/data');
+process.chdir(rootDir);
+
+const showdownRoot = resolveShowdownRoot();
+const Dex = require(showdownDistPath(showdownRoot, 'sim/dex.js')).Dex;
+Dex.includeData();
+const unusedLanDataFiles = [
+	'formats-data.js',
+	'formats.js',
+	'graphics.js.map',
+	'learnsets.js',
+	'learnsets.json',
+	'moves.json',
+	'pokedex.json',
+];
+
+function es3stringify(obj) {
+	const buf = JSON.stringify(obj);
+	return buf.replace(/"([A-Za-z][A-Za-z0-9]*)":/g, (fullMatch, key) => (
+		['return', 'new', 'delete'].includes(key) ? fullMatch : `${key}:`
+	));
+}
+
+function requireNoCache(modulePath) {
+	delete require.cache[require.resolve(modulePath)];
+	return require(modulePath);
+}
+
+function writeDataFile(filename, contents) {
+	fs.writeFileSync(path.join(dataDir, filename), contents);
+	console.log(`Built data/${filename}`);
+}
+
+function tryDownloadDataFile(filename, url) {
+	try {
+		const contents = execFileSync('curl', ['-fsSL', url], {
+			cwd: rootDir,
+			encoding: 'utf8',
+			maxBuffer: 64 * 1024 * 1024,
+			stdio: ['ignore', 'pipe', 'ignore'],
+		});
+		writeDataFile(filename, contents);
+		console.log(`Fetched data/${filename} from ${url}`);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function removeDataFile(filename) {
+	const filenamePath = path.join(dataDir, filename);
+	if (!fs.existsSync(filenamePath)) return;
+	fs.rmSync(filenamePath, {force: true});
+	console.log(`Removed data/${filename}`);
+}
+
+fs.mkdirSync(dataDir, {recursive: true});
+
+{
+	const Pokedex = requireNoCache(showdownDistPath(showdownRoot, 'data/pokedex.js')).Pokedex;
+	const FormatsData = requireNoCache(showdownDistPath(showdownRoot, 'data/formats-data.js')).FormatsData;
+	for (const id in Pokedex) {
+		const entry = Pokedex[id];
+		if (!FormatsData[id]) continue;
+		const formatsEntry = FormatsData[id];
+		if (formatsEntry.tier) entry.tier = formatsEntry.tier;
+		if (formatsEntry.isNonstandard) entry.isNonstandard = formatsEntry.isNonstandard;
+		if (formatsEntry.unreleasedHidden) entry.unreleasedHidden = formatsEntry.unreleasedHidden;
+	}
+	writeDataFile('pokedex.js', `exports.BattlePokedex = ${es3stringify(Pokedex)};`);
+}
+
+{
+	const Moves = requireNoCache(showdownDistPath(showdownRoot, 'data/moves.js')).Moves;
+	for (const id in Moves) {
+		const move = Dex.moves.get(Moves[id].name);
+		if (move.desc) Moves[id].desc = move.desc;
+		if (move.shortDesc) Moves[id].shortDesc = move.shortDesc;
+		if (move.basePowerCallback) Moves[id].basePowerCallback = true;
+	}
+	writeDataFile('moves.js', `exports.BattleMovedex = ${es3stringify(Moves)};`);
+}
+
+{
+	const Items = requireNoCache(showdownDistPath(showdownRoot, 'data/items.js')).Items;
+	for (const id in Items) {
+		const item = Dex.items.get(Items[id].name);
+		if (item.desc) Items[id].desc = item.desc;
+		if (item.shortDesc) Items[id].shortDesc = item.shortDesc;
+	}
+	writeDataFile('items.js', `exports.BattleItems = ${es3stringify(Items)};`);
+}
+
+{
+	const Abilities = requireNoCache(showdownDistPath(showdownRoot, 'data/abilities.js')).Abilities;
+	for (const id in Abilities) {
+		const ability = Dex.abilities.get(Abilities[id].name);
+		if (ability.desc) Abilities[id].desc = ability.desc;
+		if (ability.shortDesc) Abilities[id].shortDesc = ability.shortDesc;
+	}
+	writeDataFile('abilities.js', `exports.BattleAbilities = ${es3stringify(Abilities)};`);
+}
+
+{
+	const TypeChart = requireNoCache(showdownDistPath(showdownRoot, 'data/typechart.js')).TypeChart;
+	writeDataFile('typechart.js', `exports.BattleTypeChart = ${es3stringify(TypeChart)};`);
+}
+
+{
+	const Aliases = requireNoCache(showdownDistPath(showdownRoot, 'data/aliases.js')).Aliases;
+	writeDataFile('aliases.js', `exports.BattleAliases = ${es3stringify(Aliases)};`);
+}
+
+{
+	const textData = Dex.loadTextData();
+	const Text = textData.Default;
+
+	function assignData(id, entry) {
+		for (const key in entry) {
+			if (['name', 'desc', 'shortDesc'].includes(key)) continue;
+			const textEntry = Text[id] || (Text[id] = {});
+			if (key.startsWith('gen')) {
+				for (const modKey in entry[key]) {
+					textEntry[modKey + 'Gen' + key.charAt(3)] = entry[key][modKey];
+				}
+			} else {
+				textEntry[key] = entry[key];
+			}
+		}
+	}
+
+	for (const id in textData.Moves) assignData(id, textData.Moves[id]);
+	for (const id in textData.Abilities) assignData(id, textData.Abilities[id]);
+	for (const id in textData.Items) assignData(id, textData.Items[id]);
+
+	writeDataFile('text.js', `exports.BattleText = ${es3stringify(Text)};`);
+}
+
+writeDataFile('commands.js', 'exports.BattleChatCommands = {};');
+
+writeDataFile(
+	'pokedex-mini.js',
+	'exports.BattlePokemonSprites = {substitute:{exists:false,front:{w:34,h:39},back:{w:37,h:38}}};'
+);
+writeDataFile('pokedex-mini-bw.js', 'exports.BattlePokemonSpritesBW = {};');
+
+writeDataFile(
+	'graphics.js',
+	[
+		'exports.BattleEffects = {};',
+		'exports.BattleOtherAnims = {};',
+		'exports.BattleStatusAnims = {};',
+		'exports.BattleMoveAnims = {};',
+	].join('\n')
+);
+
+const downloadedIndexes =
+	tryDownloadDataFile('search-index.js', 'https://play.pokemonshowdown.com/data/search-index.js') &&
+	tryDownloadDataFile('teambuilder-tables.js', 'https://play.pokemonshowdown.com/data/teambuilder-tables.js');
+
+if (!downloadedIndexes) {
+	execFileSync(process.execPath, [path.join(__dirname, 'build-indexes')], {
+		cwd: rootDir,
+		stdio: 'inherit',
+	});
+}
+
+execFileSync('python3', [path.join(__dirname, 'build-lan-ui-assets.py')], {
+	cwd: rootDir,
+	stdio: 'inherit',
+});
+
+for (const filename of unusedLanDataFiles) {
+	removeDataFile(filename);
+}

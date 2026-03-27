@@ -347,11 +347,12 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 	override componentDidMount() {
 		const room = this.props.room;
 		const $elem = $(this.base!);
+		const backlog = room.backlog || [];
 		const battle = (room.battle ||= new Battle({
 			id: room.id as any,
 			$frame: $elem.find('.battle'),
 			$logFrame: $elem.find('.battle-log'),
-			log: room.backlog?.map(args => '|' + args.join('|')),
+			log: [],
 		}));
 		const scene = battle.scene as BattleScene;
 		room.backlog = null;
@@ -360,6 +361,9 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 		scene.tooltips.listen($elem.find('.battle-controls-container'));
 		scene.tooltips.listen(scene.log.elem);
 		super.componentDidMount();
+		for (const args of backlog) {
+			this.receiveLine(args);
+		}
 		battle.seekTurn(Infinity);
 		if (PS.prefs.autohardcore) {
 			battle.setHardcoreMode(true);
@@ -512,8 +516,8 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			class={`movebutton has-tooltip ${props.moveData.disabled ? 'disabled' : `type-${props.type}`}`}
 			aria-disabled={props.moveData.disabled}
 		>
-			{props.name}<br />
-			<small class="type">{props.type}</small> <small class="pp">{pp}</small>&nbsp;
+			{Dex.getMoveDisplayName(props.name)}<br />
+			<small class="type">{Dex.getTypeDisplayName(props.type)}</small> <small class="pp">{pp}</small>&nbsp;
 		</button>;
 	}
 	renderPokemonButton(props: {
@@ -543,7 +547,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			style={props.disabled === 'fade' ? 'opacity: 0.5' : ''} data-tooltip={props.tooltip}
 		>
 			{PSIcon({ pokemon })}
-			{pokemon.name}
+			{Dex.getPokemonDisplayName(pokemon)}
 			{
 				!props.noHPBar && !pokemon.fainted &&
 				<span class={hpColorClass}>
@@ -823,7 +827,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 		for (let i = 0; i < choices.choices.length; i++) {
 			const choiceString = choices.choices[i];
 			if (choiceString === "testfight") {
-				buf.push(`${request.side.pokemon[i].name} is locked into a move.`);
+				buf.push(`${Dex.getPokemonDisplayName(request.side.pokemon[i])} is locked into a move.`);
 				return buf;
 			}
 			let choice;
@@ -836,37 +840,37 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			const pokemon = request.side.pokemon[i];
 			const active = request.requestType === 'move' ? request.active[i] : null;
 			if (choice.choiceType === 'move') {
-				buf.push(`${pokemon.name} will `);
+				buf.push(`${Dex.getPokemonDisplayName(pokemon)} will `);
 				if (choice.mega) buf.push(<strong>Mega</strong>, ` Evolve and `);
 				if (choice.megax) buf.push(<strong>Mega</strong>, ` Evolve (X) and `);
 				if (choice.megay) buf.push(<strong>Mega</strong>, ` Evolve (Y) and `);
 				if (choice.ultra) buf.push(<strong>Ultra</strong>, ` Burst and `);
 				if (choice.tera) buf.push(`Terastallize (`, <strong>{active?.canTerastallize || '???'}</strong>, `) and `);
 				if (choice.max && active?.canDynamax) buf.push(active?.gigantamax ? `Gigantamax and ` : `Dynamax and `);
-				buf.push(`use `, <strong>{choices.currentMove(choice, i)?.name}</strong>);
+				buf.push(`use `, <strong>{Dex.getMoveDisplayName(choices.currentMove(choice, i)?.name)}</strong>);
 				if (choice.targetLoc > 0 || battle.gameType === 'freeforall') {
 					const target = battle.farSide.active[choice.targetLoc - 1];
 					if (!target) {
 						buf.push(` at slot ${choice.targetLoc}`);
 					} else {
-						buf.push(` at ${target.name}`);
+						buf.push(` at ${Dex.getPokemonDisplayName(target)}`);
 					}
 				} else if (choice.targetLoc < 0) {
 					const target = battle.nearSide.active[-choice.targetLoc - 1];
 					if (!target) {
 						buf.push(` at ally slot ${choice.targetLoc}`);
 					} else {
-						buf.push(` at ally ${target.name}`);
+						buf.push(` at ally ${Dex.getPokemonDisplayName(target)}`);
 					}
 				}
 			} else if (choice.choiceType === 'switch') {
 				const target = request.side.pokemon[choice.targetPokemon - 1];
-				buf.push(`${pokemon.name} will switch to `, <strong>{target.name}</strong>);
+				buf.push(`${Dex.getPokemonDisplayName(pokemon)} will switch to `, <strong>{Dex.getPokemonDisplayName(target)}</strong>);
 			} else if (choice.choiceType === 'shift') {
-				buf.push(`${pokemon.name} will `, <strong>shift</strong>, ` to the center`);
+				buf.push(`${Dex.getPokemonDisplayName(pokemon)} will `, <strong>shift</strong>, ` to the center`);
 			} else if (choice.choiceType === 'team') {
 				const target = request.side.pokemon[choice.targetPokemon - 1];
-				buf.push(`You picked `, <strong>{target.name}</strong>);
+				buf.push(`You picked `, <strong>{Dex.getPokemonDisplayName(target)}</strong>);
 			}
 			buf.push(<br />);
 		}
@@ -919,7 +923,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 				return <div class="controls">
 					<div class="whatdo">
 						{this.renderOldChoices(request, choices)}
-						{pokemon.name} should use <strong>{moveName}</strong> at where? {}
+						{Dex.getPokemonDisplayName(pokemon)} should use <strong>{Dex.getMoveDisplayName(moveName)}</strong> at where? {}
 					</div>
 					<div class="switchcontrols">
 						<div class="switchmenu">
@@ -934,7 +938,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			return <div class="controls">
 				<div class="whatdo">
 					{this.renderOldChoices(request, choices)}
-					What will <strong>{pokemon.name}</strong> do?
+					What will <strong>{Dex.getPokemonDisplayName(pokemon)}</strong> do?
 				</div>
 				<div class="movecontrols">
 					<h3 class="moveselect">Attack</h3>
@@ -954,7 +958,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			return <div class="controls">
 				<div class="whatdo">
 					{this.renderOldChoices(request, choices)}
-					What will <strong>{pokemon.name}</strong> do?
+					What will <strong>{Dex.getPokemonDisplayName(pokemon)}</strong> do?
 				</div>
 				<div class="switchcontrols">
 					<h3 class="switchselect">Switch</h3>

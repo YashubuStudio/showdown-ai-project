@@ -63,9 +63,10 @@ Default ports:
 Use either:
 
 - the server landing page: `http://HOST:8000`
-- the direct test client: `http://HOST:8080/play.pokemonshowdown.com/testclient.html?~~HOST:8000`
+- the direct LAN client: `http://HOST:8080/play.pokemonshowdown.com/lan.html?~~HOST:8000&serverid=koharulocal`
 
 `./scripts/start-lan-stack.sh` prints a LAN-friendly URL based on the current machine IP when possible.
+The `lan.html` entrypoint keeps name selection inside the local server and avoids the public `testclient.html` login workaround.
 
 ### 3. Run the Go tooling
 

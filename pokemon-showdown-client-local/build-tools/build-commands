@@ -4,6 +4,9 @@
  */
 
 const fs = require('fs');
+const {resolveShowdownRoot, showdownDistPath} = require('./showdown-source');
+
+const showdownRoot = resolveShowdownRoot();
 
 console.log('Building `data/commands.json` index...');
 
@@ -23,11 +26,11 @@ Object.assign(globalThis, {
 	toID: str => ("" + str).toLowerCase().replace(/[^a-z0-9]/ig, ''),
 });
 
-const { Chat } = require('../caches/pokemon-showdown/dist/server/chat');
+const { Chat } = require(showdownDistPath(showdownRoot, 'server/chat.js'));
 
 // yes, these have to be done separately, yes it sucks
 Object.assign(globalThis, {
-	Tournaments: require('../caches/pokemon-showdown/dist/server/tournaments'),
+	Tournaments: require(showdownDistPath(showdownRoot, 'server/tournaments/index.js')),
 	Chat,
 	Dex: { includeData: noop },
 });

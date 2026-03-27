@@ -63,9 +63,10 @@ cd pokemon-showdown-local
 次のどちらかを使います。
 
 - サーバーのランディングページ: `http://HOST:8000`
-- 直接テストクライアントを開く URL: `http://HOST:8080/play.pokemonshowdown.com/testclient.html?~~HOST:8000`
+- 直接 LAN クライアントを開く URL: `http://HOST:8080/play.pokemonshowdown.com/lan.html?~~HOST:8000&serverid=koharulocal`
 
 `./scripts/start-lan-stack.sh` は、取得できる場合は現在の LAN IP を使った URL を表示します。
+`lan.html` はローカルサーバー内で名前選択を完結させるため、公開 `testclient.html` のログイン回避手順が不要です。
 
 ### 3. Go ツールを使う
 
